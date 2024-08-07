@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>麻雀手牌計算</title>
+</head>
+<body>
+    <h1>麻雀手牌計算</h1>
+    <form method="post">
+        <fieldset>
+            <legend>手牌</legend>
+            <label for="man">萬子:</label>
+            <input type="text" id="man" name="man" placeholder="例: 123456" value="{{ tiles_str.man }}"><br>
+            <label for="pin">筒子:</label>
+            <input type="text" id="pin" name="pin" placeholder="例: 123456" value="{{ tiles_str.pin }}"><br>
+            <label for="sou">索子:</label>
+            <input type="text" id="sou" name="sou" placeholder="例: 123456" value="{{ tiles_str.sou }}"><br>
+        </fieldset>
+
+        <fieldset>
+            <legend>和了牌</legend>
+            <label for="win_man">萬子:</label>
+            <input type="text" id="win_man" name="win_man" placeholder="例: 5" value="{{ win_tile_str.man }}"><br>
+            <label for="win_pin">筒子:</label>
+            <input type="text" id="win_pin" name="win_pin" placeholder="例: 2" value="{{ win_tile_str.pin }}"><br>
+            <label for="win_sou">索子:</label>
+            <input type="text" id="win_sou" name="win_sou" placeholder="例: 3" value="{{ win_tile_str.sou }}"><br>
+        </fieldset>
+
+        <fieldset>
+            <legend>副露</legend>
+            <label>副露:</label>
+            <input type="text" name="melds" placeholder="例: 111:222:333,456:789:000" value="{{ melds_str }}"><br>
+            <small>例: 111:222:333は萬子、456:789:000は筒子</small><br>
+        </fieldset>
+
+        <fieldset>
+            <legend>ドラ</legend>
+            <label>ドラ表示牌:</label>
+            <input type="text" name="dora_indicators" placeholder="例: man:1,pin:5,sou:3" value="{{ dora_indicators_str }}"><br>
+            <small>例: man:1 は萬子の1, pin:5 は筒子の5, sou:3 は索子の3</small><br>
+        </fieldset>
+
+        <fieldset>
+            <legend>その他</legend>
+            <label for="is_tsumo">ツモ:</label>
+            <input type="checkbox" id="is_tsumo" name="is_tsumo" {% if request.form.get('is_tsumo') %}checked{% endif %}><br>
+        </fieldset>
+
+        <button type="submit">計算</button>
+    </form>
+
+    {% if result %}
+    <h2>結果</h2>
+    <pre>役: {{ yaku }}</pre>
+    <pre>翻: {{ han }}</pre>
+    <pre>符: {{ fu }}</pre>
+    <pre>点数: {{ cost }}</pre>
+    {% endif %}
+</body>
+</html>
