@@ -78,6 +78,11 @@ def index():
     han = None
     fu = None
     cost = None
+    tiles_str = None
+    win_tile_str = None
+    melds_str = None
+    dora_indicators_str = None
+
     if request.method == 'POST':
         tiles_str = {
             'man': request.form.get('man', ''),
