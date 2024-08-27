@@ -8,6 +8,10 @@ authors = [
 dependencies = [
     "mahjong>=1.2.1",
     "flask>=3.0.3",
+    "torch>=2.4.0",
+    "numpy>=2.1.0",
+    "yolov5>=7.0.13",
+    "opencv-python>=4.10.0.84",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"
