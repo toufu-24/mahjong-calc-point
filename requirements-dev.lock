@@ -78,6 +78,7 @@ markupsafe==2.1.5
     # via jinja2
     # via werkzeug
 matplotlib==3.9.2
+    # via mahjong-calc-point
     # via roboflow
     # via seaborn
     # via ultralytics

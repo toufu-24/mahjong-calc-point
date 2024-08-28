@@ -1,5 +1,3 @@
-runs/
 train/
 valid/
-yolov5n.pt
 yolov5s.pt
