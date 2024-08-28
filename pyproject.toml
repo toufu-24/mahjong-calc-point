@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=2.1.0",
     "yolov5>=7.0.13",
     "opencv-python>=4.10.0.84",
+    "pyqt5>=5.15.11",
     "matplotlib>=3.9.2",
 ]
 readme = "README.md"
