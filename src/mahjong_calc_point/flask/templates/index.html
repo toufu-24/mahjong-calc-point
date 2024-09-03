@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>麻雀手牌計算</title>
+    <link rel="stylesheet" href="static/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>麻雀手牌計算</h1>
+        <form method="post">
+            <fieldset>
+                <legend>手牌</legend>
+                <label for="man">萬子:</label>
+                <input type="text" id="man" name="man" placeholder="例: 123456" value="{{ tiles_str.man }}"><br>
+                <label for="pin">筒子:</label>
+                <input type="text" id="pin" name="pin" placeholder="例: 123456" value="{{ tiles_str.pin }}"><br>
+                <label for="sou">索子:</label>
+                <input type="text" id="sou" name="sou" placeholder="例: 123456" value="{{ tiles_str.sou }}"><br>
+                <label for="honors">字牌:</label>
+                <input type="text" id="honors" name="honors" placeholder="例: 12345678"
+                    value="{{ tiles_str.honors }}"><br>
+            </fieldset>
+
+            <fieldset>
+                <legend>和了牌</legend>
+                <label for="win_man">萬子:</label>
+                <input type="text" id="win_man" name="win_man" placeholder="例: 5" value="{{ win_tile_str.man }}"><br>
+                <label for="win_pin">筒子:</label>
+                <input type="text" id="win_pin" name="win_pin" placeholder="例: 2" value="{{ win_tile_str.pin }}"><br>
+                <label for="win_sou">索子:</label>
+                <input type="text" id="win_sou" name="win_sou" placeholder="例: 3" value="{{ win_tile_str.sou }}"><br>
+                <label for="win_honors">字牌:</label>
+                <input type="text" id="win_honors" name="win_honors" placeholder="例: 1"
+                    value="{{ win_tile_str.honors }}"><br>
+            </fieldset>
+
+            <fieldset>
+                <legend>副露</legend>
+                <label for="melds_man">萬子:</label>
+                <input type="text" id="melds_man" name="melds_man" placeholder="例: p111,a2222"
+                    value="{{ melds_str.man }}"><br>
+                <label for="melds_pin">筒子:</label>
+                <input type="text" id="melds_pin" name="melds_pin" placeholder="例: c456,m1111"
+                    value="{{ melds_str.pin }}"><br>
+                <label for="melds_sou">索子:</label>
+                <input type="text" id="melds_sou" name="melds_sou" placeholder="例: p333,c123"
+                    value="{{ melds_str.sou }}"><br>
+                <label for="melds_honors">字牌:</label>
+                <input type="text" id="melds_honors" name="melds_honors" placeholder="例: p111"
+                    value="{{ melds_str.honors }}"><br>
+                <small>カンマ区切りで複数指定可能．チーはc,ポンはp,暗槓はa,明槓はmを前に付けてください</small><br>
+            </fieldset>
+
+            <fieldset>
+                <legend>ドラ</legend>
+                <label for="dora_man">萬子:</label>
+                <input type="text" id="dora_man" name="dora_man" placeholder="例: 13"
+                    value="{{ dora_indicators_str.man }}"><br>
+                <label for="dora_pin">筒子:</label>
+                <input type="text" id="dora_pin" name="dora_pin" placeholder="例: 5"
+                    value="{{ dora_indicators_str.pin }}"><br>
+                <label for="dora_sou">索子:</label>
+                <input type="text" id="dora_sou" name="dora_sou" placeholder="例: 35"
+                    value="{{ dora_indicators_str.sou }}"><br>
+                <label for="dora_honors">字牌:</label>
+                <input type="text" id="dora_honors" name="dora_honors" placeholder="例: 7"
+                    value="{{ dora_indicators_str.honors }}"><br>
+            </fieldset>
+
+            <fieldset>
+                <legend>その他</legend>
+                <label for="is_riichi">リーチ:</label>
+                <input type="checkbox" id="is_riichi" name="is_riichi" {% if request.form.get('is_riichi') %}checked{%
+                    endif %}><br>
+
+                <label for="is_daburu_riichi">ダブルリーチ:</label>
+                <input type="checkbox" id="is_daburu_riichi" name="is_daburu_riichi" {% if
+                    request.form.get('is_daburu_riichi') %}checked{% endif %}><br>
+
+                <label for="is_tsumo">ツモ:</label>
+                <input type="checkbox" id="is_tsumo" name="is_tsumo" {% if request.form.get('is_tsumo') %}checked{%
+                    endif %}><br>
+
+                <label for="is_ippatsu">一発:</label>
+                <input type="checkbox" id="is_ippatsu" name="is_ippatsu" {% if request.form.get('is_ippatsu')
+                    %}checked{% endif %}><br>
+
+                <label for="is_chankan">槍槓:</label>
+                <input type="checkbox" id="is_chankan" name="is_chankan" {% if request.form.get('is_chankan')
+                    %}checked{% endif %}><br>
+
+                <label for="is_rinshan">嶺上開花:</label>
+                <input type="checkbox" id="is_rinshan" name="is_rinshan" {% if request.form.get('is_rinshan')
+                    %}checked{% endif %}><br>
+
+                <label for="is_haitei">海底摸月:</label>
+                <input type="checkbox" id="is_haitei" name="is_haitei" {% if request.form.get('is_haitei') %}checked{%
+                    endif %}><br>
+
+                <label for="is_houtei">河底撈魚:</label>
+                <input type="checkbox" id="is_houtei" name="is_houtei" {% if request.form.get('is_houtei') %}checked{%
+                    endif %}><br>
+
+
+                <label for="is_nagashi_mangan">流し満貫:</label>
+                <input type="checkbox" id="is_nagashi_mangan" name="is_nagashi_mangan" {% if
+                    request.form.get('is_nagashi_mangan') %}checked{% endif %}><br>
+
+                <label for="is_tenhou">天和:</label>
+                <input type="checkbox" id="is_tenhou" name="is_tenhou" {% if request.form.get('is_tenhou') %}checked{%
+                    endif %}><br>
+
+                <label for="is_chiihou">地和:</label>
+                <input type="checkbox" id="is_chiihou" name="is_chiihou" {% if request.form.get('is_chiihou')
+                    %}checked{% endif %}><br>
+
+                <label for="is_renhou">人和:</label>
+                <input type="checkbox" id="is_renhou" name="is_renhou" {% if request.form.get('is_renhou') %}checked{%
+                    endif %}><br>
+
+            </fieldset>
+
+
+            <button type="submit">計算</button>
+        </form>
+
+        {% if result %}
+        <div class="result">
+            <h2>結果</h2>
+            <pre>役: {{ yaku }}</pre>
+            <pre>翻: {{ han }}</pre>
+            <pre>符: {{ fu }}</pre>
+            <pre>点数: {{ cost }}</pre>
+        </div>
+        {% endif %}
+    </div>
+</body>
+
+</html>

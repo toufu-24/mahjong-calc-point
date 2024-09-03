@@ -17,7 +17,7 @@ detect_yolo.run(
     conf_thres=0.25,
     iou_thres=0.45,
     device="0" if torch.cuda.is_available() else "cpu",
-    save_txt=False,
+    save_txt=True,
     save_conf=False,
     save_crop=False,
     project="runs/detect",
@@ -29,9 +29,6 @@ detect_yolo.run(
 output_image_path = Path("runs/detect/exp/") / image_path.name
 
 # 画像の読み込みと表示
-# img = cv2.imread(str(output_image_path))
-# plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-# plt.show()
 img = cv2.imread("img/dataset.jpg")
 plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 plt.show()
