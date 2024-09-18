@@ -1,3 +1,4 @@
 /train/
 valid/
 yolov5s.pt
+/runs/
