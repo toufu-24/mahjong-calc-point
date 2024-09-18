@@ -202,7 +202,6 @@ def index():
         result = calculate_hand(
             tiles_dict, win_tile_dict, melds_dict, dora_indicators_dict, config_dict
         )
-        print(HandConstants.KAZOE_LIMITED)
         # 結果を取得
         if result:
             try:
