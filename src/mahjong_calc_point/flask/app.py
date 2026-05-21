@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request
+from flask import Flask, jsonify, render_template, request
 from mahjong.hand_calculating.hand import HandCalculator
 from mahjong.meld import Meld
 from mahjong.hand_calculating.hand_config import HandConfig, OptionalRules
 from mahjong.tile import TilesConverter
 from enum import Enum
 from typing import Dict
+
+from mahjong_calc_point.detection import detect_tiles
 
 app = Flask(__name__)
 calculator = HandCalculator()
@@ -230,6 +232,22 @@ def index():
         fu=fu,
         cost=cost,
     )
+
+
+@app.route("/api/detect", methods=["POST"])
+def detect():
+    image = request.files.get("image")
+    if image is None or image.filename == "":
+        return jsonify({"error": "image file is required"}), 400
+
+    try:
+        result = detect_tiles(image.read())
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"推論に失敗しました: {str(e)}"}), 500
+
+    return jsonify(result)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,23 @@
 <body>
     <div class="container">
         <h1>麻雀手牌計算</h1>
+
+        <section class="camera-section">
+            <h2>牌認識</h2>
+            <div class="viewer">
+                <video id="cameraPreview" autoplay playsinline muted></video>
+                <canvas id="captureCanvas"></canvas>
+            </div>
+            <div class="actions">
+                <button type="button" id="startCameraButton">カメラ開始</button>
+                <button type="button" id="captureButton" disabled>撮影して認識</button>
+            </div>
+            <label for="imageUpload">画像から認識:</label>
+            <input type="file" id="imageUpload" accept="image/*">
+            <p id="detectStatus" class="status">カメラを開始するか、画像を選択してください。</p>
+            <div id="detections" class="detections"></div>
+        </section>
+
         <form method="post">
             <fieldset>
                 <legend>手牌</legend>
@@ -138,6 +155,138 @@
         </div>
         {% endif %}
     </div>
+
+    <script>
+        const video = document.getElementById("cameraPreview");
+        const canvas = document.getElementById("captureCanvas");
+        const context = canvas.getContext("2d");
+        const startCameraButton = document.getElementById("startCameraButton");
+        const captureButton = document.getElementById("captureButton");
+        const imageUpload = document.getElementById("imageUpload");
+        const detectStatus = document.getElementById("detectStatus");
+        const detectionsElement = document.getElementById("detections");
+
+        let latestImage = null;
+
+        function setStatus(message) {
+            detectStatus.textContent = message;
+        }
+
+        function drawImageToCanvas(source, width, height) {
+            canvas.width = width;
+            canvas.height = height;
+            context.clearRect(0, 0, width, height);
+            context.drawImage(source, 0, 0, width, height);
+            canvas.style.display = "block";
+        }
+
+        function renderDetections(result) {
+            if (!latestImage) {
+                return;
+            }
+
+            drawImageToCanvas(latestImage, result.image_width, result.image_height);
+            context.lineWidth = Math.max(2, result.image_width / 320);
+            context.font = `${Math.max(14, result.image_width / 42)}px Arial`;
+            context.textBaseline = "top";
+
+            detectionsElement.innerHTML = "";
+            if (result.detections.length === 0) {
+                detectionsElement.textContent = "検出なし";
+                setStatus("検出結果: 0件");
+                return;
+            }
+
+            const list = document.createElement("ol");
+            result.detections.forEach((detection) => {
+                const label = `${detection.label} ${(detection.confidence * 100).toFixed(1)}%`;
+                context.strokeStyle = "#00a86b";
+                context.fillStyle = "rgba(0, 168, 107, 0.82)";
+                context.strokeRect(detection.x, detection.y, detection.width, detection.height);
+
+                const textWidth = context.measureText(label).width + 8;
+                const textHeight = Math.max(18, result.image_width / 32);
+                const textY = Math.max(0, detection.y - textHeight);
+                context.fillRect(detection.x, textY, textWidth, textHeight);
+                context.fillStyle = "#fff";
+                context.fillText(label, detection.x + 4, textY + 2);
+
+                const item = document.createElement("li");
+                item.textContent = label;
+                list.appendChild(item);
+            });
+            detectionsElement.appendChild(list);
+            setStatus(`検出結果: ${result.detections.length}件`);
+        }
+
+        async function detectBlob(blob) {
+            setStatus("推論中...");
+            const formData = new FormData();
+            formData.append("image", blob, "capture.jpg");
+
+            const response = await fetch("/api/detect", {
+                method: "POST",
+                body: formData,
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || "推論に失敗しました");
+            }
+            renderDetections(result);
+        }
+
+        startCameraButton.addEventListener("click", async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" },
+                    audio: false,
+                });
+                video.srcObject = stream;
+                video.style.display = "block";
+                captureButton.disabled = false;
+                setStatus("カメラを起動しました。");
+            } catch (error) {
+                setStatus(`カメラを起動できません: ${error.message}`);
+            }
+        });
+
+        captureButton.addEventListener("click", () => {
+            if (!video.videoWidth || !video.videoHeight) {
+                setStatus("カメラ映像を取得できていません。");
+                return;
+            }
+
+            drawImageToCanvas(video, video.videoWidth, video.videoHeight);
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    setStatus("画像化に失敗しました。");
+                    return;
+                }
+                const image = new Image();
+                image.onload = () => {
+                    latestImage = image;
+                    detectBlob(blob).catch((error) => setStatus(error.message));
+                };
+                image.src = URL.createObjectURL(blob);
+            }, "image/jpeg", 0.9);
+        });
+
+        imageUpload.addEventListener("change", () => {
+            const file = imageUpload.files[0];
+            if (!file) {
+                return;
+            }
+
+            const image = new Image();
+            image.onload = () => {
+                latestImage = image;
+                drawImageToCanvas(image, image.naturalWidth, image.naturalHeight);
+                detectBlob(file).catch((error) => setStatus(error.message));
+                URL.revokeObjectURL(image.src);
+            };
+            image.src = URL.createObjectURL(file);
+        });
+    </script>
 </body>
 
 </html>
