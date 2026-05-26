@@ -19,7 +19,19 @@ COPY annotation ./annotation
 COPY src ./src
 
 RUN pip install --upgrade pip \
-    && pip install -e . \
-    && python -c "import torch, torchvision; print(torch.__version__); print(torchvision.__version__)"
+    && pip install \
+        "mahjong>=1.2.1" \
+        "flask>=3.0.3" \
+        "numpy<2" \
+        "yolov5>=7.0.13" \
+        "opencv-python-headless>=4.10.0.84" \
+        "matplotlib>=3.9.2" \
+        "ultralytics>=8.2.83" \
+        "mypy>=1.11.2" \
+    && pip install --force-reinstall --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 \
+        "torch==2.3.1" \
+        "torchvision==0.18.1" \
+    && pip install --no-deps -e . \
+    && python -c "import torch, torchvision; print(torch.__version__, torch.version.cuda); print(torchvision.__version__); print(torch.cuda.is_available())"
 
 CMD ["python", "annotation/train_tile_classifier.py", "--epochs", "20", "--batch-size", "128", "--num-workers", "2", "--device", "cuda", "--pretrained"]

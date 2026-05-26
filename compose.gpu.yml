@@ -10,6 +10,8 @@ services:
     environment:
       ROBOFLOW_API_KEY: ${ROBOFLOW_API_KEY:-}
     shm_size: "8gb"
+    stdin_open: true
+    tty: true
     deploy:
       resources:
         reservations:
@@ -30,3 +32,27 @@ services:
       - --device
       - cuda
       - --pretrained
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+    image: mahjong-calc-point:cuda
+    working_dir: /workspace/mahjong-calc-point
+    volumes:
+      - .:/workspace/mahjong-calc-point
+    environment:
+      ROBOFLOW_API_KEY: ${ROBOFLOW_API_KEY:-}
+    shm_size: "8gb"
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities:
+                - gpu
+    command:
+      - sleep
+      - infinity

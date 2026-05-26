@@ -72,6 +72,15 @@ Dockerの場合:
 docker compose -f compose.gpu.yml run --rm trainer
 ```
 
+VS Codeでコンテナ内に入って作業する場合は、Dev Containers拡張を入れてから `Dev Containers: Reopen in Container` を実行します。中では `/workspace/mahjong-calc-point` が作業ディレクトリです。
+
+ターミナルで入るだけなら:
+
+```bash
+docker compose -f compose.gpu.yml up -d dev
+docker compose -f compose.gpu.yml exec dev bash
+```
+
 MacでMPSを使う場合:
 
 ```bash

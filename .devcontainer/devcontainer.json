@@ -1,0 +1,22 @@
+{
+  "name": "mahjong-calc-point-gpu",
+  "dockerComposeFile": "../compose.gpu.yml",
+  "service": "dev",
+  "workspaceFolder": "/workspace/mahjong-calc-point",
+  "overrideCommand": true,
+  "runServices": ["dev"],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.black-formatter",
+        "ms-toolsai.jupyter"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/conda/bin/python",
+        "python.terminal.activateEnvironment": false
+      }
+    }
+  },
+  "postCreateCommand": "python -c \"import torch; print('cuda:', torch.cuda.is_available())\""
+}
