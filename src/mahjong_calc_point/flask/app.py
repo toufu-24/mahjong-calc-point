@@ -4,12 +4,80 @@ from mahjong.meld import Meld
 from mahjong.hand_calculating.hand_config import HandConfig, OptionalRules
 from mahjong.tile import TilesConverter
 from enum import Enum
-from typing import Dict
+from typing import Any, Dict
 
 from mahjong_calc_point.detection import detect_tiles
 
 app = Flask(__name__)
 calculator = HandCalculator()
+
+
+def parse_calculation_form(form: Any):
+    tiles_dict = {
+        "man": form.get("man", ""),
+        "pin": form.get("pin", ""),
+        "sou": form.get("sou", ""),
+        "honors": form.get("honors", ""),
+    }
+    win_tile_dict = {
+        "man": form.get("win_man", ""),
+        "pin": form.get("win_pin", ""),
+        "sou": form.get("win_sou", ""),
+        "honors": form.get("win_honors", ""),
+    }
+    melds_dict = {
+        "man": form.get("melds_man", ""),
+        "pin": form.get("melds_pin", ""),
+        "sou": form.get("melds_sou", ""),
+        "honors": form.get("melds_honors", ""),
+    }
+    dora_indicators_dict = {
+        "man": form.get("dora_man", ""),
+        "pin": form.get("dora_pin", ""),
+        "sou": form.get("dora_sou", ""),
+        "honors": form.get("dora_honors", ""),
+    }
+    config_dict = {
+        "is_riichi": form.get("is_riichi", "off") == "on",
+        "is_daburu_riichi": form.get("is_daburu_riichi", "off") == "on",
+        "is_tsumo": form.get("is_tsumo", "off") == "on",
+        "is_ippatsu": form.get("is_ippatsu", "off") == "on",
+        "is_chankan": form.get("is_chankan", "off") == "on",
+        "is_rinshan": form.get("is_rinshan", "off") == "on",
+        "is_haitei": form.get("is_haitei", "off") == "on",
+        "is_houtei": form.get("is_houtei", "off") == "on",
+        "is_nagashi_mangan": form.get("is_nagashi_mangan", "off") == "on",
+        "is_tenhou": form.get("is_tenhou", "off") == "on",
+        "is_chiihou": form.get("is_chiihou", "off") == "on",
+        "is_renhou": form.get("is_renhou", "off") == "on",
+    }
+    return (
+        tiles_dict,
+        win_tile_dict,
+        melds_dict,
+        dora_indicators_dict,
+        config_dict,
+    )
+
+
+def serialize_calculation_result(result: Any) -> dict[str, Any]:
+    try:
+        return {
+            "ok": True,
+            "yaku": [str(yaku) for yaku in result.yaku],
+            "han": result.han,
+            "fu": result.fu,
+            "cost": result.cost.get("main", ""),
+        }
+    except Exception:
+        return {
+            "ok": False,
+            "error": str(result),
+            "yaku": str(result),
+            "han": "",
+            "fu": "",
+            "cost": "",
+        }
 
 
 # useful helper
@@ -154,51 +222,13 @@ def index():
     dora_indicators_dict = {}
 
     if request.method == "POST":
-        # 手牌
-        tiles_dict = {
-            "man": request.form.get("man", ""),
-            "pin": request.form.get("pin", ""),
-            "sou": request.form.get("sou", ""),
-            "honors": request.form.get("honors", ""),
-        }
-        # 和了牌
-        win_tile_dict = {
-            "man": request.form.get("win_man", ""),
-            "pin": request.form.get("win_pin", ""),
-            "sou": request.form.get("win_sou", ""),
-            "honors": request.form.get("win_honors", ""),
-        }
-        # configの情報を取得
-        config_dict = {
-            "is_riichi": request.form.get("is_riichi", "off") == "on",
-            "is_daburu_riichi": request.form.get("is_daburu_riichi", "off") == "on",
-            "is_tsumo": request.form.get("is_tsumo", "off") == "on",
-            "is_ippatsu": request.form.get("is_ippatsu", "off") == "on",
-            "is_chankan": request.form.get("is_chankan", "off") == "on",
-            "is_rinshan": request.form.get("is_rinshan", "off") == "on",
-            "is_haitei": request.form.get("is_haitei", "off") == "on",
-            "is_houtei": request.form.get("is_houtei", "off") == "on",
-            "is_nagashi_mangan": request.form.get("is_nagashi_mangan", "off") == "on",
-            "is_tenhou": request.form.get("is_tenhou", "off") == "on",
-            "is_chiihou": request.form.get("is_chiihou", "off") == "on",
-            "is_renhou": request.form.get("is_renhou", "off") == "on",
-        }
-
-        # 副露の情報を各牌種別ごとに取得
-        melds_dict = {
-            "man": request.form.get("melds_man", ""),
-            "pin": request.form.get("melds_pin", ""),
-            "sou": request.form.get("melds_sou", ""),
-            "honors": request.form.get("melds_honors", ""),
-        }
-
-        # ドラ表示牌の情報を各牌種別ごとに取得
-        dora_indicators_dict = {
-            "man": request.form.get("dora_man", ""),
-            "pin": request.form.get("dora_pin", ""),
-            "sou": request.form.get("dora_sou", ""),
-            "honors": request.form.get("dora_honors", ""),
-        }
+        (
+            tiles_dict,
+            win_tile_dict,
+            melds_dict,
+            dora_indicators_dict,
+            config_dict,
+        ) = parse_calculation_form(request.form)
 
         # 手牌計算の関数呼び出し
         result = calculate_hand(
@@ -232,6 +262,21 @@ def index():
         fu=fu,
         cost=cost,
     )
+
+
+@app.route("/api/calculate", methods=["POST"])
+def calculate():
+    (
+        tiles_dict,
+        win_tile_dict,
+        melds_dict,
+        dora_indicators_dict,
+        config_dict,
+    ) = parse_calculation_form(request.form)
+    result = calculate_hand(
+        tiles_dict, win_tile_dict, melds_dict, dora_indicators_dict, config_dict
+    )
+    return jsonify(serialize_calculation_result(result))
 
 
 @app.route("/api/detect", methods=["POST"])

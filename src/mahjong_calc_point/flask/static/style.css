@@ -100,6 +100,10 @@ body {
     border-bottom: 0;
 }
 
+.result.empty {
+    display: none;
+}
+
 .pane-header {
     display: flex;
     justify-content: space-between;

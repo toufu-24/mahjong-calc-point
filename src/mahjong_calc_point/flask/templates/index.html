@@ -161,15 +161,13 @@
 
         </form>
 
-        {% if result %}
-        <div class="result">
+        <div id="scoreResult" class="result{% if not result %} empty{% endif %}" aria-live="polite">
             <h2>結果</h2>
-            <pre>役: {{ yaku }}</pre>
-            <pre>翻: {{ han }}</pre>
-            <pre>符: {{ fu }}</pre>
-            <pre>点数: {{ cost }}</pre>
+            <pre id="resultYaku">役: {% if result %}{{ yaku }}{% else %}-{% endif %}</pre>
+            <pre id="resultHan">翻: {% if result %}{{ han }}{% else %}-{% endif %}</pre>
+            <pre id="resultFu">符: {% if result %}{{ fu }}{% else %}-{% endif %}</pre>
+            <pre id="resultCost">点数: {% if result %}{{ cost }}{% else %}-{% endif %}</pre>
         </div>
-        {% endif %}
             </div>
         </main>
     </div>
@@ -187,6 +185,11 @@
         const addTileButton = document.getElementById("addTileButton");
         const applyDetectionsButton = document.getElementById("applyDetectionsButton");
         const scoreForm = document.getElementById("scoreForm");
+        const scoreResult = document.getElementById("scoreResult");
+        const resultYaku = document.getElementById("resultYaku");
+        const resultHan = document.getElementById("resultHan");
+        const resultFu = document.getElementById("resultFu");
+        const resultCost = document.getElementById("resultCost");
         const handInputs = {
             m: document.getElementById("man"),
             p: document.getElementById("pin"),
@@ -498,6 +501,48 @@
             }
             renderDetections(result);
         }
+
+        function renderScoreResult(result) {
+            scoreResult.classList.remove("empty");
+            if (result.ok) {
+                const yakuText = Array.isArray(result.yaku) ? result.yaku.join(", ") : result.yaku;
+                resultYaku.textContent = `役: ${yakuText || "-"}`;
+                resultHan.textContent = `翻: ${result.han ?? "-"}`;
+                resultFu.textContent = `符: ${result.fu ?? "-"}`;
+                resultCost.textContent = `点数: ${result.cost ?? "-"}`;
+                setStatus("点数計算が完了しました。");
+                return;
+            }
+
+            resultYaku.textContent = `エラー: ${result.error || "計算に失敗しました"}`;
+            resultHan.textContent = "翻: -";
+            resultFu.textContent = "符: -";
+            resultCost.textContent = "点数: -";
+            setStatus("点数計算に失敗しました。入力を確認してください。");
+        }
+
+        scoreForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const submitButton = scoreForm.querySelector(".submit-button");
+            submitButton.disabled = true;
+            setStatus("点数計算中...");
+
+            try {
+                const response = await fetch("/api/calculate", {
+                    method: "POST",
+                    body: new FormData(scoreForm),
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || "点数計算に失敗しました");
+                }
+                renderScoreResult(result);
+            } catch (error) {
+                renderScoreResult({ ok: false, error: error.message });
+            } finally {
+                submitButton.disabled = false;
+            }
+        });
 
         applyDetectionsButton.addEventListener("click", () => {
             applyDetectedTiles();
