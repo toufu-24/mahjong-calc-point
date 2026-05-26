@@ -119,6 +119,10 @@ body {
     letter-spacing: 0;
 }
 
+.score-form > .pane-header:last-child {
+    margin: 12px 0 0;
+}
+
 .viewer {
     position: relative;
     width: 100%;
@@ -330,25 +334,145 @@ input[type="checkbox"] {
     background: #f8eaea;
 }
 
-details {
-    border-top: 1px solid var(--line);
-    padding-top: 4px;
-    margin-top: 6px;
+.advanced-panel {
+    overflow: hidden;
+    margin-top: 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-subtle);
 }
 
-summary {
-    cursor: pointer;
+.advanced-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 54px;
+    padding: 11px 13px;
     color: var(--text);
+}
+
+.summary-copy {
+    display: grid;
+    gap: 3px;
+}
+
+.summary-title {
     font-size: 14px;
     font-weight: 700;
-    padding: 10px 0;
 }
 
-small {
-    display: block;
-    margin-top: 8px;
+.summary-subtitle,
+.option-note {
     color: var(--muted);
-    line-height: 1.5;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.advanced-content {
+    display: grid;
+    gap: 0;
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+}
+
+.option-section {
+    margin: 0;
+    padding: 13px;
+    border-bottom: 1px solid var(--line);
+}
+
+.option-section:last-child {
+    border-bottom: 0;
+}
+
+.option-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 9px;
+}
+
+.option-header h3 {
+    margin: 0;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+.compact-grid {
+    gap: 8px;
+}
+
+.builder-row {
+    display: grid;
+    grid-template-columns: minmax(96px, 0.7fr) minmax(160px, 1fr) auto;
+    gap: 8px;
+    align-items: end;
+}
+
+.builder-row label {
+    min-width: 0;
+}
+
+.dora-builder-row {
+    grid-template-columns: minmax(160px, 1fr) auto;
+}
+
+.builder-button {
+    min-width: 64px;
+}
+
+.chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    min-height: 38px;
+    margin-top: 10px;
+    padding: 8px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 8px;
+    background: var(--surface-subtle);
+}
+
+.chip-list.empty {
+    align-items: center;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.selection-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 100%;
+    min-height: 30px;
+    padding: 5px 6px 5px 10px;
+    border: 1px solid #b9ddcf;
+    border-radius: 999px;
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.selection-chip button {
+    min-width: 22px;
+    min-height: 22px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--primary-dark);
+    font-size: 14px;
+    line-height: 1;
+}
+
+.selection-chip button:hover {
+    background: #d7eee5;
 }
 
 .toggle-grid {
@@ -357,15 +481,41 @@ small {
     gap: 8px;
 }
 
-.toggle-grid label {
+.toggle-option {
     display: flex;
     align-items: center;
-    min-height: 36px;
-    padding: 7px 9px;
+    gap: 8px;
+    min-height: 38px;
+    padding: 8px 10px;
     border: 1px solid var(--line);
     border-radius: 6px;
     background: var(--surface-subtle);
     color: var(--text);
+    cursor: pointer;
+    transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.toggle-option:hover {
+    border-color: var(--line-strong);
+    background: var(--surface);
+}
+
+.toggle-option:has(input:checked) {
+    border-color: #8dc7b1;
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+}
+
+.toggle-option input[type="checkbox"] {
+    flex: 0 0 auto;
+    accent-color: var(--primary);
+    margin: 0;
+}
+
+.toggle-option span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .result h2 {
@@ -421,6 +571,19 @@ small {
     .input-grid,
     .toggle-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .builder-row {
+        grid-template-columns: 1fr;
+    }
+
+    .builder-button {
+        width: 100%;
+    }
+
+    .option-header {
+        display: grid;
+        gap: 3px;
     }
 
     .tile-editor {

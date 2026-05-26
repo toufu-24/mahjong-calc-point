@@ -41,123 +41,98 @@
                         <h2>認識結果</h2>
                         <div class="review-actions">
                             <button type="button" id="addTileButton" class="secondary-button">牌を追加</button>
-                            <button type="button" id="applyDetectionsButton" class="secondary-button" disabled>反映</button>
                         </div>
                     </div>
                     <div id="detections" class="detections empty">未認識</div>
                 </section>
 
         <form method="post" id="scoreForm" class="score-form">
+            <input type="hidden" id="man" name="man" value="{{ tiles_str.man }}">
+            <input type="hidden" id="pin" name="pin" value="{{ tiles_str.pin }}">
+            <input type="hidden" id="sou" name="sou" value="{{ tiles_str.sou }}">
+            <input type="hidden" id="honors" name="honors" value="{{ tiles_str.honors }}">
+
+            <input type="hidden" id="win_man" name="win_man" value="{{ win_tile_str.man }}">
+            <input type="hidden" id="win_pin" name="win_pin" value="{{ win_tile_str.pin }}">
+            <input type="hidden" id="win_sou" name="win_sou" value="{{ win_tile_str.sou }}">
+            <input type="hidden" id="win_honors" name="win_honors" value="{{ win_tile_str.honors }}">
+
+            <div class="advanced-panel">
+                <div class="advanced-summary">
+                    <span class="summary-copy">
+                        <span class="summary-title">副露・ドラ・状況役</span>
+                    </span>
+                </div>
+                <div class="advanced-content">
+                    <div class="option-section">
+                        <div class="option-header">
+                            <h3>副露</h3>
+                            <span class="option-note">種類と牌を選んで追加</span>
+                        </div>
+                        <input type="hidden" id="melds_man" name="melds_man" value="{{ melds_str.man }}">
+                        <input type="hidden" id="melds_pin" name="melds_pin" value="{{ melds_str.pin }}">
+                        <input type="hidden" id="melds_sou" name="melds_sou" value="{{ melds_str.sou }}">
+                        <input type="hidden" id="melds_honors" name="melds_honors" value="{{ melds_str.honors }}">
+                        <div class="builder-row">
+                            <label for="meldType">種類
+                                <select id="meldType">
+                                    <option value="c">チー</option>
+                                    <option value="p">ポン</option>
+                                    <option value="a">暗槓</option>
+                                    <option value="m">明槓</option>
+                                </select>
+                            </label>
+                            <label for="meldTile">牌
+                                <select id="meldTile"></select>
+                            </label>
+                            <button type="button" id="addMeldButton" class="secondary-button builder-button">追加</button>
+                        </div>
+                        <div id="meldList" class="chip-list empty">副露なし</div>
+                    </div>
+
+                    <div class="option-section">
+                        <div class="option-header">
+                            <h3>ドラ表示牌</h3>
+                        </div>
+                        <input type="hidden" id="dora_man" name="dora_man" value="{{ dora_indicators_str.man }}">
+                        <input type="hidden" id="dora_pin" name="dora_pin" value="{{ dora_indicators_str.pin }}">
+                        <input type="hidden" id="dora_sou" name="dora_sou" value="{{ dora_indicators_str.sou }}">
+                        <input type="hidden" id="dora_honors" name="dora_honors" value="{{ dora_indicators_str.honors }}">
+                        <div class="builder-row dora-builder-row">
+                            <label for="doraTile">牌
+                                <select id="doraTile"></select>
+                            </label>
+                            <button type="button" id="addDoraButton" class="secondary-button builder-button">追加</button>
+                        </div>
+                        <div id="doraList" class="chip-list empty">ドラ表示牌なし</div>
+                    </div>
+
+                    <div class="option-section">
+                        <div class="option-header">
+                            <h3>状況役</h3>
+                        </div>
+                        <div class="toggle-grid">
+                            <label class="toggle-option"><input type="checkbox" id="is_riichi" name="is_riichi" {% if request.form.get('is_riichi') %}checked{% endif %}> <span>リーチ</span></label>
+                            <label class="toggle-option"><input type="checkbox" id="is_daburu_riichi" name="is_daburu_riichi" {% if request.form.get('is_daburu_riichi') %}checked{% endif %}> <span>ダブルリーチ</span></label>
+                            <label class="toggle-option"><input type="checkbox" id="is_tsumo" name="is_tsumo" {% if request.form.get('is_tsumo') %}checked{% endif %}> <span>ツモ</span></label>
+                            <label class="toggle-option"><input type="checkbox" id="is_ippatsu" name="is_ippatsu" {% if request.form.get('is_ippatsu') %}checked{% endif %}> <span>一発</span></label>
+                            <label class="toggle-option"><input type="checkbox" id="is_chankan" name="is_chankan" {% if request.form.get('is_chankan') %}checked{% endif %}> <span>槍槓</span></label>
+                            <label class="toggle-option"><input type="checkbox" id="is_rinshan" name="is_rinshan" {% if request.form.get('is_rinshan') %}checked{% endif %}> <span>嶺上開花</span></label>
+                            <label class="toggle-option"><input type="checkbox" id="is_haitei" name="is_haitei" {% if request.form.get('is_haitei') %}checked{% endif %}> <span>海底摸月</span></label>
+                            <label class="toggle-option"><input type="checkbox" id="is_houtei" name="is_houtei" {% if request.form.get('is_houtei') %}checked{% endif %}> <span>河底撈魚</span></label>
+                            <label class="toggle-option"><input type="checkbox" id="is_nagashi_mangan" name="is_nagashi_mangan" {% if request.form.get('is_nagashi_mangan') %}checked{% endif %}> <span>流し満貫</span></label>
+                            <label class="toggle-option"><input type="checkbox" id="is_tenhou" name="is_tenhou" {% if request.form.get('is_tenhou') %}checked{% endif %}> <span>天和</span></label>
+                            <label class="toggle-option"><input type="checkbox" id="is_chiihou" name="is_chiihou" {% if request.form.get('is_chiihou') %}checked{% endif %}> <span>地和</span></label>
+                            <label class="toggle-option"><input type="checkbox" id="is_renhou" name="is_renhou" {% if request.form.get('is_renhou') %}checked{% endif %}> <span>人和</span></label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="pane-header">
                 <h2>計算内容</h2>
                 <button type="submit" class="submit-button">点数計算</button>
             </div>
-            <fieldset>
-                <legend>手牌</legend>
-                <div class="input-grid">
-                    <label for="man">萬子
-                        <input type="text" id="man" name="man" placeholder="例: 123456" value="{{ tiles_str.man }}">
-                    </label>
-                    <label for="pin">筒子
-                        <input type="text" id="pin" name="pin" placeholder="例: 123456" value="{{ tiles_str.pin }}">
-                    </label>
-                    <label for="sou">索子
-                        <input type="text" id="sou" name="sou" placeholder="例: 123456" value="{{ tiles_str.sou }}">
-                    </label>
-                    <label for="honors">字牌
-                        <input type="text" id="honors" name="honors" placeholder="例: 1234567"
-                            value="{{ tiles_str.honors }}">
-                    </label>
-                </div>
-            </fieldset>
-
-            <fieldset>
-                <legend>和了牌</legend>
-                <div class="input-grid">
-                    <label for="win_man">萬子
-                        <input type="text" id="win_man" name="win_man" placeholder="例: 5"
-                            value="{{ win_tile_str.man }}">
-                    </label>
-                    <label for="win_pin">筒子
-                        <input type="text" id="win_pin" name="win_pin" placeholder="例: 2"
-                            value="{{ win_tile_str.pin }}">
-                    </label>
-                    <label for="win_sou">索子
-                        <input type="text" id="win_sou" name="win_sou" placeholder="例: 3"
-                            value="{{ win_tile_str.sou }}">
-                    </label>
-                    <label for="win_honors">字牌
-                        <input type="text" id="win_honors" name="win_honors" placeholder="例: 1"
-                            value="{{ win_tile_str.honors }}">
-                    </label>
-                </div>
-            </fieldset>
-
-            <details>
-                <summary>副露・ドラ・状況役を入力</summary>
-                <fieldset>
-                    <legend>副露</legend>
-                    <div class="input-grid">
-                        <label for="melds_man">萬子
-                            <input type="text" id="melds_man" name="melds_man" placeholder="例: p111,a2222"
-                                value="{{ melds_str.man }}">
-                        </label>
-                        <label for="melds_pin">筒子
-                            <input type="text" id="melds_pin" name="melds_pin" placeholder="例: c456,m1111"
-                                value="{{ melds_str.pin }}">
-                        </label>
-                        <label for="melds_sou">索子
-                            <input type="text" id="melds_sou" name="melds_sou" placeholder="例: p333,c123"
-                                value="{{ melds_str.sou }}">
-                        </label>
-                        <label for="melds_honors">字牌
-                            <input type="text" id="melds_honors" name="melds_honors" placeholder="例: p111"
-                                value="{{ melds_str.honors }}">
-                        </label>
-                    </div>
-                    <small>カンマ区切りで複数指定可能。チーはc、ポンはp、暗槓はa、明槓はmを前に付けてください。</small>
-                </fieldset>
-
-                <fieldset>
-                    <legend>ドラ表示牌</legend>
-                    <div class="input-grid">
-                        <label for="dora_man">萬子
-                            <input type="text" id="dora_man" name="dora_man" placeholder="例: 13"
-                                value="{{ dora_indicators_str.man }}">
-                        </label>
-                        <label for="dora_pin">筒子
-                            <input type="text" id="dora_pin" name="dora_pin" placeholder="例: 5"
-                                value="{{ dora_indicators_str.pin }}">
-                        </label>
-                        <label for="dora_sou">索子
-                            <input type="text" id="dora_sou" name="dora_sou" placeholder="例: 35"
-                                value="{{ dora_indicators_str.sou }}">
-                        </label>
-                        <label for="dora_honors">字牌
-                            <input type="text" id="dora_honors" name="dora_honors" placeholder="例: 7"
-                                value="{{ dora_indicators_str.honors }}">
-                        </label>
-                    </div>
-                </fieldset>
-
-                <fieldset>
-                    <legend>その他</legend>
-                    <div class="toggle-grid">
-                        <label><input type="checkbox" id="is_riichi" name="is_riichi" {% if request.form.get('is_riichi') %}checked{% endif %}> リーチ</label>
-                        <label><input type="checkbox" id="is_daburu_riichi" name="is_daburu_riichi" {% if request.form.get('is_daburu_riichi') %}checked{% endif %}> ダブルリーチ</label>
-                        <label><input type="checkbox" id="is_tsumo" name="is_tsumo" {% if request.form.get('is_tsumo') %}checked{% endif %}> ツモ</label>
-                        <label><input type="checkbox" id="is_ippatsu" name="is_ippatsu" {% if request.form.get('is_ippatsu') %}checked{% endif %}> 一発</label>
-                        <label><input type="checkbox" id="is_chankan" name="is_chankan" {% if request.form.get('is_chankan') %}checked{% endif %}> 槍槓</label>
-                        <label><input type="checkbox" id="is_rinshan" name="is_rinshan" {% if request.form.get('is_rinshan') %}checked{% endif %}> 嶺上開花</label>
-                        <label><input type="checkbox" id="is_haitei" name="is_haitei" {% if request.form.get('is_haitei') %}checked{% endif %}> 海底摸月</label>
-                        <label><input type="checkbox" id="is_houtei" name="is_houtei" {% if request.form.get('is_houtei') %}checked{% endif %}> 河底撈魚</label>
-                        <label><input type="checkbox" id="is_nagashi_mangan" name="is_nagashi_mangan" {% if request.form.get('is_nagashi_mangan') %}checked{% endif %}> 流し満貫</label>
-                        <label><input type="checkbox" id="is_tenhou" name="is_tenhou" {% if request.form.get('is_tenhou') %}checked{% endif %}> 天和</label>
-                        <label><input type="checkbox" id="is_chiihou" name="is_chiihou" {% if request.form.get('is_chiihou') %}checked{% endif %}> 地和</label>
-                        <label><input type="checkbox" id="is_renhou" name="is_renhou" {% if request.form.get('is_renhou') %}checked{% endif %}> 人和</label>
-                    </div>
-                </fieldset>
-            </details>
 
         </form>
 
@@ -183,7 +158,6 @@
         const detectCount = document.getElementById("detectCount");
         const detectionsElement = document.getElementById("detections");
         const addTileButton = document.getElementById("addTileButton");
-        const applyDetectionsButton = document.getElementById("applyDetectionsButton");
         const scoreForm = document.getElementById("scoreForm");
         const scoreResult = document.getElementById("scoreResult");
         const resultYaku = document.getElementById("resultYaku");
@@ -202,11 +176,32 @@
             s: document.getElementById("win_sou"),
             z: document.getElementById("win_honors"),
         };
+        const meldInputs = {
+            m: document.getElementById("melds_man"),
+            p: document.getElementById("melds_pin"),
+            s: document.getElementById("melds_sou"),
+            z: document.getElementById("melds_honors"),
+        };
+        const doraInputs = {
+            m: document.getElementById("dora_man"),
+            p: document.getElementById("dora_pin"),
+            s: document.getElementById("dora_sou"),
+            z: document.getElementById("dora_honors"),
+        };
+        const meldType = document.getElementById("meldType");
+        const meldTile = document.getElementById("meldTile");
+        const addMeldButton = document.getElementById("addMeldButton");
+        const meldList = document.getElementById("meldList");
+        const doraTile = document.getElementById("doraTile");
+        const addDoraButton = document.getElementById("addDoraButton");
+        const doraList = document.getElementById("doraList");
 
         let latestImage = null;
         let detectedTiles = [];
         let selectedWinIndex = null;
         let currentImageSize = { width: 0, height: 0 };
+        let meldSelections = [];
+        let doraSelections = [];
 
         const TILE_OPTIONS = [
             {
@@ -243,6 +238,12 @@
                 ],
             },
         ];
+        const MELD_TYPE_LABELS = {
+            c: "チー",
+            p: "ポン",
+            a: "暗槓",
+            m: "明槓",
+        };
 
         function setStatus(message) {
             detectStatus.textContent = message;
@@ -251,7 +252,6 @@
         function handleDetectError(error) {
             setStatus(error.message);
             detectCount.textContent = "失敗";
-            applyDetectionsButton.disabled = true;
         }
 
         function parseTileLabel(label) {
@@ -270,6 +270,185 @@
                 }
             }
             return label;
+        }
+
+        function createOption(value, text, selectedValue) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = text;
+            option.selected = value === selectedValue;
+            return option;
+        }
+
+        function appendTileOptions(select, selectedValue = "") {
+            select.innerHTML = "";
+            TILE_OPTIONS.forEach((group) => {
+                const optgroup = document.createElement("optgroup");
+                optgroup.label = group.name;
+                group.tiles.forEach((tile) => {
+                    optgroup.appendChild(createOption(tile.code, tile.name, selectedValue));
+                });
+                select.appendChild(optgroup);
+            });
+        }
+
+        function appendMeldTileOptions() {
+            const selectedValue = meldTile.value;
+            meldTile.innerHTML = "";
+            const isChi = meldType.value === "c";
+            const groups = isChi ? TILE_OPTIONS.slice(0, 3) : TILE_OPTIONS;
+            groups.forEach((group) => {
+                const optgroup = document.createElement("optgroup");
+                optgroup.label = group.name;
+                group.tiles.forEach((tile) => {
+                    const parsed = parseTileLabel(tile.code);
+                    if (!parsed || (isChi && Number(parsed.value) > 7)) {
+                        return;
+                    }
+                    const label = isChi ? `${getTileName(tile.code)}から` : tile.name;
+                    optgroup.appendChild(createOption(tile.code, label, selectedValue));
+                });
+                meldTile.appendChild(optgroup);
+            });
+        }
+
+        function buildMeldCode(type, tileCode) {
+            const parsed = parseTileLabel(tileCode);
+            if (!parsed) {
+                return null;
+            }
+            if (type === "c") {
+                const start = Number(parsed.value);
+                if (parsed.suit === "z" || start > 7) {
+                    return null;
+                }
+                return {
+                    suit: parsed.suit,
+                    code: `c${start}${start + 1}${start + 2}`,
+                    label: `${getTileName(tileCode)}からチー`,
+                };
+            }
+            const count = type === "p" ? 3 : 4;
+            return {
+                suit: parsed.suit,
+                code: `${type}${parsed.value.repeat(count)}`,
+                label: `${getTileName(tileCode)} ${MELD_TYPE_LABELS[type]}`,
+            };
+        }
+
+        function parseMeldSelectionsFromInputs() {
+            meldSelections = [];
+            Object.entries(meldInputs).forEach(([suit, input]) => {
+                input.value.split(",").filter(Boolean).forEach((code) => {
+                    const type = code[0];
+                    const values = code.slice(1);
+                    const tileCode = `${values[0]}${suit}`;
+                    meldSelections.push({
+                        suit,
+                        type,
+                        code,
+                        label: type === "c" ? `${getTileName(tileCode)}からチー` : `${getTileName(tileCode)} ${MELD_TYPE_LABELS[type] || ""}`,
+                    });
+                });
+            });
+        }
+
+        function syncMeldInputs() {
+            Object.values(meldInputs).forEach((input) => {
+                input.value = "";
+            });
+            Object.entries(meldInputs).forEach(([suit, input]) => {
+                input.value = meldSelections
+                    .filter((meld) => meld.suit === suit)
+                    .map((meld) => meld.code)
+                    .join(",");
+            });
+        }
+
+        function renderMeldList() {
+            meldList.innerHTML = "";
+            if (meldSelections.length === 0) {
+                meldList.textContent = "副露なし";
+                meldList.classList.add("empty");
+                return;
+            }
+            meldList.classList.remove("empty");
+            meldSelections.forEach((meld, index) => {
+                const chip = document.createElement("span");
+                chip.className = "selection-chip";
+                chip.textContent = meld.label;
+
+                const button = document.createElement("button");
+                button.type = "button";
+                button.setAttribute("aria-label", `${meld.label}を削除`);
+                button.textContent = "×";
+                button.addEventListener("click", () => {
+                    meldSelections.splice(index, 1);
+                    syncMeldInputs();
+                    renderMeldList();
+                });
+                chip.appendChild(button);
+                meldList.appendChild(chip);
+            });
+        }
+
+        function parseDoraSelectionsFromInputs() {
+            doraSelections = [];
+            Object.entries(doraInputs).forEach(([suit, input]) => {
+                for (const value of input.value) {
+                    doraSelections.push({ suit, value, code: `${value}${suit}` });
+                }
+            });
+        }
+
+        function syncDoraInputs() {
+            Object.values(doraInputs).forEach((input) => {
+                input.value = "";
+            });
+            Object.entries(doraInputs).forEach(([suit, input]) => {
+                input.value = doraSelections
+                    .filter((tile) => tile.suit === suit)
+                    .map((tile) => tile.value)
+                    .join("");
+            });
+        }
+
+        function renderDoraList() {
+            doraList.innerHTML = "";
+            if (doraSelections.length === 0) {
+                doraList.textContent = "ドラ表示牌なし";
+                doraList.classList.add("empty");
+                return;
+            }
+            doraList.classList.remove("empty");
+            doraSelections.forEach((tile, index) => {
+                const chip = document.createElement("span");
+                chip.className = "selection-chip";
+                chip.textContent = getTileName(tile.code);
+
+                const button = document.createElement("button");
+                button.type = "button";
+                button.setAttribute("aria-label", `${getTileName(tile.code)}を削除`);
+                button.textContent = "×";
+                button.addEventListener("click", () => {
+                    doraSelections.splice(index, 1);
+                    syncDoraInputs();
+                    renderDoraList();
+                });
+                chip.appendChild(button);
+                doraList.appendChild(chip);
+            });
+        }
+
+        function initializeOptionalTileInputs() {
+            appendMeldTileOptions();
+            appendTileOptions(doraTile);
+            parseMeldSelectionsFromInputs();
+            parseDoraSelectionsFromInputs();
+            syncMeldInputs();
+            syncDoraInputs();
+            renderMeldList();
+            renderDoraList();
         }
 
         function createTileSelect(value, index) {
@@ -415,12 +594,10 @@
                 detectionsElement.textContent = "牌がありません。追加するか、もう一度認識してください。";
                 detectionsElement.classList.add("empty");
                 detectCount.textContent = "0件";
-                applyDetectionsButton.disabled = true;
                 selectedWinIndex = null;
                 return;
             }
 
-            applyDetectionsButton.disabled = false;
             detectionsElement.classList.remove("empty");
 
             const editorList = document.createElement("div");
@@ -487,7 +664,6 @@
         async function detectBlob(blob) {
             setStatus("推論中...");
             detectCount.textContent = "推論中";
-            applyDetectionsButton.disabled = true;
             const formData = new FormData();
             formData.append("image", blob, "capture.jpg");
 
@@ -521,10 +697,37 @@
             setStatus("点数計算に失敗しました。入力を確認してください。");
         }
 
+        meldType.addEventListener("change", appendMeldTileOptions);
+
+        addMeldButton.addEventListener("click", () => {
+            const meld = buildMeldCode(meldType.value, meldTile.value);
+            if (!meld) {
+                setStatus("副露にできない組み合わせです。");
+                return;
+            }
+            meldSelections.push(meld);
+            syncMeldInputs();
+            renderMeldList();
+            setStatus(`${meld.label} を追加しました。`);
+        });
+
+        addDoraButton.addEventListener("click", () => {
+            const parsed = parseTileLabel(doraTile.value);
+            if (!parsed) {
+                return;
+            }
+            doraSelections.push({ suit: parsed.suit, value: parsed.value, code: doraTile.value });
+            syncDoraInputs();
+            renderDoraList();
+            setStatus(`${getTileName(doraTile.value)} をドラ表示牌に追加しました。`);
+        });
+
         scoreForm.addEventListener("submit", async (event) => {
             event.preventDefault();
             const submitButton = scoreForm.querySelector(".submit-button");
             submitButton.disabled = true;
+            syncMeldInputs();
+            syncDoraInputs();
             setStatus("点数計算中...");
 
             try {
@@ -542,12 +745,6 @@
             } finally {
                 submitButton.disabled = false;
             }
-        });
-
-        applyDetectionsButton.addEventListener("click", () => {
-            applyDetectedTiles();
-            scoreForm.scrollIntoView({ behavior: "smooth", block: "start" });
-            setStatus("認識結果を手牌欄に反映しました。");
         });
 
         addTileButton.addEventListener("click", () => {
@@ -619,6 +816,8 @@
             };
             image.src = URL.createObjectURL(file);
         });
+
+        initializeOptionalTileInputs();
     </script>
 </body>
 
