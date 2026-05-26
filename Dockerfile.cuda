@@ -1,0 +1,25 @@
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        git \
+        libglib2.0-0 \
+        libgl1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/mahjong-calc-point
+
+COPY pyproject.toml README.md ./
+COPY annotation ./annotation
+COPY src ./src
+
+RUN pip install --upgrade pip \
+    && pip install -e . \
+    && python -c "import torch, torchvision; print(torch.__version__); print(torchvision.__version__)"
+
+CMD ["python", "annotation/train_tile_classifier.py", "--epochs", "20", "--batch-size", "128", "--num-workers", "2", "--device", "cuda", "--pretrained"]

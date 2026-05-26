@@ -1,0 +1,32 @@
+services:
+  trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+    image: mahjong-calc-point:cuda
+    working_dir: /workspace/mahjong-calc-point
+    volumes:
+      - .:/workspace/mahjong-calc-point
+    environment:
+      ROBOFLOW_API_KEY: ${ROBOFLOW_API_KEY:-}
+    shm_size: "8gb"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities:
+                - gpu
+    command:
+      - python
+      - annotation/train_tile_classifier.py
+      - --epochs
+      - "20"
+      - --batch-size
+      - "128"
+      - --num-workers
+      - "2"
+      - --device
+      - cuda
+      - --pretrained

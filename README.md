@@ -29,11 +29,29 @@ CUDA版PyTorchを使う環境では、必要に応じてその環境の手順で
 uv pip install --index-url https://download.pytorch.org/whl/cu121 torch torchvision
 ```
 
+サーバーでDockerを使う場合は、ホスト側に `uv` は不要です。DockerとNVIDIA Container Toolkitが使える状態で実行します。
+
+```bash
+git clone https://github.com/toufu-24/mahjong-calc-point.git
+cd mahjong-calc-point
+docker compose -f compose.gpu.yml build
+docker compose -f compose.gpu.yml run --rm trainer python -c "import torch; print(torch.cuda.is_available())"
+```
+
+`True` が出ればCUDAを使えます。以降のコマンドは `docker compose -f compose.gpu.yml run --rm trainer ...` の形で実行できます。
+
 データセットを取得してcrop分類データを生成します。
 
 ```bash
 ROBOFLOW_API_KEY=... uv run python annotation/download_roboflow_dataset.py
 uv run python annotation/build_classification_dataset.py
+```
+
+Dockerの場合:
+
+```bash
+ROBOFLOW_API_KEY=... docker compose -f compose.gpu.yml run --rm trainer python annotation/download_roboflow_dataset.py
+docker compose -f compose.gpu.yml run --rm trainer python annotation/build_classification_dataset.py
 ```
 
 ブラウザでZIPをダウンロードした場合は、代わりに次のように展開できます。
@@ -46,6 +64,12 @@ uv run python annotation/download_roboflow_dataset.py --zip ~/Downloads/your-rob
 
 ```bash
 uv run python annotation/train_tile_classifier.py --epochs 20 --batch-size 128 --num-workers 2 --device cuda --pretrained
+```
+
+Dockerの場合:
+
+```bash
+docker compose -f compose.gpu.yml run --rm trainer
 ```
 
 MacでMPSを使う場合:
