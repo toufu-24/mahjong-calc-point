@@ -1,10 +1,16 @@
 # python generated files
 __pycache__/
 *.py[oc]
+.DS_Store
 build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
+.mypy_cache/
 
 # venv
 .venv
+
+# local model artifacts
+src/mahjong_calc_point/classifier/

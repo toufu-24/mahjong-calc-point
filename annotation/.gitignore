@@ -1,4 +1,7 @@
 /train/
-valid/
+/valid/
+/test/
+/classification/
+/*.yolov5pytorch/
 yolov5s.pt
 /runs/

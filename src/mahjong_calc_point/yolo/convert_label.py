@@ -1,38 +1,12 @@
+try:
+    from mahjong_calc_point.tiles import TILE_LABELS
+except ModuleNotFoundError:
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from mahjong_calc_point.tiles import TILE_LABELS
+
+
 def convert(idx: int) -> str:
-    converter = [
-        "1m",
-        "1p",
-        "1s",
-        "1z",
-        "2m",
-        "2p",
-        "2s",
-        "2z",
-        "3m",
-        "3p",
-        "3s",
-        "3z",
-        "4m",
-        "4p",
-        "4s",
-        "4z",
-        "5m",
-        "5p",
-        "5s",
-        "5z",
-        "6m",
-        "6p",
-        "6s",
-        "6z",
-        "7m",
-        "7p",
-        "7s",
-        "7z",
-        "8m",
-        "8p",
-        "8s",
-        "9m",
-        "9p",
-        "9s",
-    ]
-    return converter[idx]
+    return TILE_LABELS[idx]
