@@ -18,6 +18,7 @@ os.environ.setdefault("MPLCONFIGDIR", tempfile.gettempdir())
 os.environ.setdefault("YOLO_CONFIG_DIR", tempfile.gettempdir())
 
 MODEL_PATH = Path(__file__).resolve().parent / "yolo" / "best.pt"
+DEFAULT_DUPLICATE_IOU_THRESHOLD = 0.75
 
 _model: Any | None = None
 _model_lock = threading.Lock()
@@ -114,6 +115,7 @@ def detect_tiles(image_bytes: bytes) -> dict[str, Any]:
             }
         )
 
+    detections = _suppress_duplicate_detections(detections)
     detections.sort(key=lambda item: (item["y"], item["x"]))
     return {
         "image_width": width,
@@ -121,3 +123,65 @@ def detect_tiles(image_bytes: bytes) -> dict[str, Any]:
         "classifier_available": classifier is not None and classifier_exists(),
         "detections": detections,
     }
+
+
+def _get_duplicate_iou_threshold() -> float:
+    value = os.environ.get(
+        "MAHJONG_DUPLICATE_IOU_THRESHOLD", str(DEFAULT_DUPLICATE_IOU_THRESHOLD)
+    )
+    return max(0.0, min(1.0, float(value)))
+
+
+def _suppress_duplicate_detections(
+    detections: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    threshold = _get_duplicate_iou_threshold()
+    if threshold <= 0.0 or len(detections) < 2:
+        return detections
+
+    kept: list[dict[str, Any]] = []
+    for detection in sorted(
+        detections, key=lambda item: item["detector_confidence"], reverse=True
+    ):
+        overlaps_kept_detection = any(
+            _detection_iou(detection, kept_detection) >= threshold
+            for kept_detection in kept
+        )
+        if not overlaps_kept_detection:
+            kept.append(detection)
+    return kept
+
+
+def _detection_iou(first: dict[str, Any], second: dict[str, Any]) -> float:
+    first_box = _detection_box(first)
+    second_box = _detection_box(second)
+
+    x1 = max(first_box[0], second_box[0])
+    y1 = max(first_box[1], second_box[1])
+    x2 = min(first_box[2], second_box[2])
+    y2 = min(first_box[3], second_box[3])
+    intersection = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+    if intersection <= 0.0:
+        return 0.0
+
+    first_area = max(0.0, first_box[2] - first_box[0]) * max(
+        0.0, first_box[3] - first_box[1]
+    )
+    second_area = max(0.0, second_box[2] - second_box[0]) * max(
+        0.0, second_box[3] - second_box[1]
+    )
+    union = first_area + second_area - intersection
+    if union <= 0.0:
+        return 0.0
+    return intersection / union
+
+
+def _detection_box(detection: dict[str, Any]) -> tuple[float, float, float, float]:
+    x1 = float(detection["x"])
+    y1 = float(detection["y"])
+    return (
+        x1,
+        y1,
+        x1 + float(detection["width"]),
+        y1 + float(detection["height"]),
+    )

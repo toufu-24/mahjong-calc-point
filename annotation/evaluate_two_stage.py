@@ -64,7 +64,12 @@ def main() -> None:
     totals = {
         "images": 0,
         "gt_boxes": 0,
+        "detections": 0,
         "matched_boxes": 0,
+        "missed_boxes": 0,
+        "extra_detections": 0,
+        "matched_iou_sum": 0.0,
+        "matched_iou_min": 1.0,
         "two_stage_correct": 0,
         "detector_correct": 0,
         "exact_images": 0,
@@ -95,10 +100,15 @@ def main() -> None:
 
         totals["images"] += 1
         totals["gt_boxes"] += len(gt_boxes)
+        totals["detections"] += len(detections)
         totals["matched_boxes"] += len(matches)
+        totals["missed_boxes"] += len(gt_boxes) - len(matches)
+        totals["extra_detections"] += len(detections) - len(matches)
 
         image_exact = len(matches) == len(gt_boxes) == len(detections)
-        for gt, detection in matches:
+        for gt, detection, iou in matches:
+            totals["matched_iou_sum"] += iou
+            totals["matched_iou_min"] = min(totals["matched_iou_min"], iou)
             if detection["label"] == gt["label"]:
                 totals["two_stage_correct"] += 1
             else:
@@ -210,7 +220,7 @@ def _match_detections(
     gt_boxes: list[dict],
     detections: list[dict],
     iou_threshold: float,
-) -> list[tuple[dict, dict]]:
+) -> list[tuple[dict, dict, float]]:
     candidates = []
     for gt_index, gt in enumerate(gt_boxes):
         for detection_index, detection in enumerate(detections):
@@ -229,12 +239,12 @@ def _match_detections(
     matches = []
     used_gt = set()
     used_detection = set()
-    for _, gt_index, detection_index in sorted(candidates, reverse=True):
+    for iou, gt_index, detection_index in sorted(candidates, reverse=True):
         if gt_index in used_gt or detection_index in used_detection:
             continue
         used_gt.add(gt_index)
         used_detection.add(detection_index)
-        matches.append((gt_boxes[gt_index], detections[detection_index]))
+        matches.append((gt_boxes[gt_index], detections[detection_index], iou))
     return matches
 
 
@@ -258,7 +268,12 @@ def _print_metrics(totals: dict[str, int]) -> None:
     images = max(1, totals["images"])
     print(f"images: {totals['images']}")
     print(f"gt boxes: {totals['gt_boxes']}")
+    print(f"detections: {totals['detections']}")
     print(f"matched boxes: {totals['matched_boxes']} ({totals['matched_boxes'] / gt_boxes:.4f})")
+    print(f"missed boxes: {totals['missed_boxes']}")
+    print(f"extra detections: {totals['extra_detections']}")
+    print(f"matched bbox avg iou: {totals['matched_iou_sum'] / matched:.4f}")
+    print(f"matched bbox min iou: {totals['matched_iou_min'] if totals['matched_boxes'] else 0.0:.4f}")
     print(
         "two-stage label accuracy on matched boxes: "
         f"{totals['two_stage_correct'] / matched:.4f}"
