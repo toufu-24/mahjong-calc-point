@@ -3,8 +3,9 @@ from mahjong.hand_calculating.hand import HandCalculator
 from mahjong.meld import Meld
 from mahjong.hand_calculating.hand_config import HandConfig, OptionalRules
 from mahjong.tile import TilesConverter
+from mahjong.constants import EAST, SOUTH
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from mahjong_calc_point.detection import detect_tiles
 
@@ -50,6 +51,7 @@ def parse_calculation_form(form: Any):
         "is_tenhou": form.get("is_tenhou", "off") == "on",
         "is_chiihou": form.get("is_chiihou", "off") == "on",
         "is_renhou": form.get("is_renhou", "off") == "on",
+        "player_wind": EAST if form.get("is_dealer", "off") == "on" else SOUTH,
     }
     return (
         tiles_dict,
@@ -60,14 +62,40 @@ def parse_calculation_form(form: Any):
     )
 
 
-def serialize_calculation_result(result: Any) -> dict[str, Any]:
+def format_payment(cost: dict[str, Any], is_tsumo: bool, is_dealer: bool) -> str:
+    main = cost.get("main", "")
+    additional = cost.get("additional", "")
+    total = cost.get("total", "")
+
+    if main == "":
+        return ""
+
+    if not is_tsumo:
+        return f"放銃者から {main}点"
+
+    if is_dealer:
+        total_text = f" (合計 {total}点)" if total else ""
+        return f"子3人から {main}点ずつ{total_text}"
+
+    total_text = f" (合計 {total}点)" if total else ""
+    return f"親から {main}点、子2人から {additional}点ずつ{total_text}"
+
+
+def serialize_calculation_result(
+    result: Any, config_dict: Optional[Dict[str, Any]] = None
+) -> dict[str, Any]:
     try:
+        cost = result.cost
+        config_dict = config_dict or {}
+        is_tsumo = bool(config_dict.get("is_tsumo", False))
+        is_dealer = config_dict.get("player_wind") == EAST
         return {
             "ok": True,
             "yaku": [str(yaku) for yaku in result.yaku],
             "han": result.han,
             "fu": result.fu,
-            "cost": result.cost.get("main", ""),
+            "cost": cost.get("main", ""),
+            "payment": format_payment(cost, is_tsumo, is_dealer),
         }
     except Exception:
         return {
@@ -77,6 +105,7 @@ def serialize_calculation_result(result: Any) -> dict[str, Any]:
             "han": "",
             "fu": "",
             "cost": "",
+            "payment": "",
         }
 
 
@@ -216,6 +245,7 @@ def index():
     han = ""
     fu = ""
     cost = ""
+    payment = ""
     tiles_dict = {}
     win_tile_dict = {}
     melds_dict = {}
@@ -241,6 +271,11 @@ def index():
                 han = result.han
                 fu = result.fu
                 cost = result.cost["main"]
+                payment = format_payment(
+                    result.cost,
+                    config_dict.get("is_tsumo", False),
+                    config_dict.get("player_wind") == EAST,
+                )
                 # print_hand_result(result)
             except Exception as e:
                 print(result)
@@ -249,6 +284,7 @@ def index():
                 han = ""
                 fu = ""
                 cost = ""
+                payment = ""
 
     return render_template(
         "index.html",
@@ -261,6 +297,7 @@ def index():
         han=han,
         fu=fu,
         cost=cost,
+        payment=payment,
     )
 
 
@@ -276,7 +313,7 @@ def calculate():
     result = calculate_hand(
         tiles_dict, win_tile_dict, melds_dict, dora_indicators_dict, config_dict
     )
-    return jsonify(serialize_calculation_result(result))
+    return jsonify(serialize_calculation_result(result, config_dict))
 
 
 @app.route("/api/detect", methods=["POST"])

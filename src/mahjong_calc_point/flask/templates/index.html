@@ -112,6 +112,7 @@
                             <h3>状況役</h3>
                         </div>
                         <div class="toggle-grid">
+                            <label class="toggle-option"><input type="checkbox" id="is_dealer" name="is_dealer" {% if request.form.get('is_dealer') %}checked{% endif %}> <span>親</span></label>
                             <label class="toggle-option"><input type="checkbox" id="is_riichi" name="is_riichi" {% if request.form.get('is_riichi') %}checked{% endif %}> <span>リーチ</span></label>
                             <label class="toggle-option"><input type="checkbox" id="is_daburu_riichi" name="is_daburu_riichi" {% if request.form.get('is_daburu_riichi') %}checked{% endif %}> <span>ダブルリーチ</span></label>
                             <label class="toggle-option"><input type="checkbox" id="is_tsumo" name="is_tsumo" {% if request.form.get('is_tsumo') %}checked{% endif %}> <span>ツモ</span></label>
@@ -142,6 +143,7 @@
             <pre id="resultHan">翻: {% if result %}{{ han }}{% else %}-{% endif %}</pre>
             <pre id="resultFu">符: {% if result %}{{ fu }}{% else %}-{% endif %}</pre>
             <pre id="resultCost">点数: {% if result %}{{ cost }}{% else %}-{% endif %}</pre>
+            <pre id="resultPayment">支払い: {% if result %}{{ payment }}{% else %}-{% endif %}</pre>
         </div>
             </div>
         </main>
@@ -164,6 +166,7 @@
         const resultHan = document.getElementById("resultHan");
         const resultFu = document.getElementById("resultFu");
         const resultCost = document.getElementById("resultCost");
+        const resultPayment = document.getElementById("resultPayment");
         const handInputs = {
             m: document.getElementById("man"),
             p: document.getElementById("pin"),
@@ -686,6 +689,7 @@
                 resultHan.textContent = `翻: ${result.han ?? "-"}`;
                 resultFu.textContent = `符: ${result.fu ?? "-"}`;
                 resultCost.textContent = `点数: ${result.cost ?? "-"}`;
+                resultPayment.textContent = `支払い: ${result.payment || "-"}`;
                 setStatus("点数計算が完了しました。");
                 return;
             }
@@ -694,6 +698,7 @@
             resultHan.textContent = "翻: -";
             resultFu.textContent = "符: -";
             resultCost.textContent = "点数: -";
+            resultPayment.textContent = "支払い: -";
             setStatus("点数計算に失敗しました。入力を確認してください。");
         }
 
