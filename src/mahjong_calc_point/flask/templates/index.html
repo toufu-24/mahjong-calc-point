@@ -247,6 +247,21 @@
             a: "暗槓",
             m: "明槓",
         };
+        const DETECTION_ROLE_LABELS = {
+            hand: "手牌",
+            win: "和了",
+            meld: "副露",
+            dora: "ドラ",
+            ignored: "除外",
+        };
+        const DETECTION_ROLE_STYLES = {
+            hand: { stroke: "#00a86b", fill: "rgba(0, 168, 107, 0.82)" },
+            win: { stroke: "#b7791f", fill: "rgba(183, 121, 31, 0.86)" },
+            meld: { stroke: "#2563eb", fill: "rgba(37, 99, 235, 0.84)" },
+            dora: { stroke: "#8b5cf6", fill: "rgba(139, 92, 246, 0.84)" },
+            ignored: { stroke: "#7b8790", fill: "rgba(123, 135, 144, 0.78)" },
+        };
+        const ACTIVE_HAND_ROLES = new Set(["hand", "win", "meld"]);
 
         function setStatus(message) {
             detectStatus.textContent = message;
@@ -329,6 +344,7 @@
                     suit: parsed.suit,
                     code: `c${start}${start + 1}${start + 2}`,
                     label: `${getTileName(tileCode)}からチー`,
+                    source: "manual",
                 };
             }
             const count = type === "p" ? 3 : 4;
@@ -336,6 +352,7 @@
                 suit: parsed.suit,
                 code: `${type}${parsed.value.repeat(count)}`,
                 label: `${getTileName(tileCode)} ${MELD_TYPE_LABELS[type]}`,
+                source: "manual",
             };
         }
 
@@ -351,6 +368,7 @@
                         type,
                         code,
                         label: type === "c" ? `${getTileName(tileCode)}からチー` : `${getTileName(tileCode)} ${MELD_TYPE_LABELS[type] || ""}`,
+                        source: "manual",
                     });
                 });
             });
@@ -386,6 +404,15 @@
                 button.setAttribute("aria-label", `${meld.label}を削除`);
                 button.textContent = "×";
                 button.addEventListener("click", () => {
+                    if (meld.source === "detected" && Array.isArray(meld.tileIndexes)) {
+                        meld.tileIndexes.forEach((tileIndex) => {
+                            if (detectedTiles[tileIndex]) {
+                                detectedTiles[tileIndex].role = "hand";
+                            }
+                        });
+                        refreshDetectionState(`${meld.label} を副露から外しました。`);
+                        return;
+                    }
                     meldSelections.splice(index, 1);
                     syncMeldInputs();
                     renderMeldList();
@@ -399,7 +426,7 @@
             doraSelections = [];
             Object.entries(doraInputs).forEach(([suit, input]) => {
                 for (const value of input.value) {
-                    doraSelections.push({ suit, value, code: `${value}${suit}` });
+                    doraSelections.push({ suit, value, code: `${value}${suit}`, source: "manual" });
                 }
             });
         }
@@ -434,6 +461,13 @@
                 button.setAttribute("aria-label", `${getTileName(tile.code)}を削除`);
                 button.textContent = "×";
                 button.addEventListener("click", () => {
+                    if (tile.source === "detected" && Number.isInteger(tile.tileIndex)) {
+                        if (detectedTiles[tile.tileIndex]) {
+                            detectedTiles[tile.tileIndex].role = "ignored";
+                        }
+                        refreshDetectionState(`${getTileName(tile.code)} をドラ表示牌から外しました。`);
+                        return;
+                    }
                     doraSelections.splice(index, 1);
                     syncDoraInputs();
                     renderDoraList();
@@ -474,27 +508,61 @@
 
             select.addEventListener("change", () => {
                 detectedTiles[index].label = select.value;
-                drawDetectionOverlay();
-                applyDetectedTiles();
-                setStatus(`${getTileName(select.value)} に修正しました。`);
+                refreshDetectionState(`${getTileName(select.value)} に修正しました。`);
             });
             return select;
         }
 
-        function getVisualTileOrder(detections) {
-            const tiles = detections
-                .map((detection, index) => ({
-                    ...detection,
-                    index,
-                    centerX: detection.x + detection.width / 2,
-                    centerY: detection.y + detection.height / 2,
-                }))
+        function createRoleSelect(role, index) {
+            const select = document.createElement("select");
+            select.className = "role-select";
+            select.setAttribute("aria-label", "役割を修正");
+
+            Object.entries(DETECTION_ROLE_LABELS).forEach(([value, text]) => {
+                select.appendChild(createOption(value, text, role));
+            });
+
+            select.addEventListener("change", () => {
+                if (select.value === "win") {
+                    detectedTiles.forEach((tile) => {
+                        if (tile.role === "win") {
+                            tile.role = "hand";
+                        }
+                    });
+                }
+                detectedTiles[index].role = select.value;
+                refreshDetectionState(`${getTileName(detectedTiles[index].label)} を${DETECTION_ROLE_LABELS[select.value]}にしました。`);
+            });
+            return select;
+        }
+
+        function medianValue(values) {
+            const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+            if (sorted.length === 0) {
+                return 0;
+            }
+            const middle = Math.floor(sorted.length / 2);
+            return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
+        }
+
+        function withTileGeometry(tiles) {
+            return tiles.map((tile, index) => ({
+                ...tile,
+                index,
+                centerX: tile.x + tile.width / 2,
+                centerY: tile.y + tile.height / 2,
+            }));
+        }
+
+        function groupTilesByRows(tiles) {
+            const finiteTiles = tiles
+                .filter((tile) => Number.isFinite(tile.centerY) && Number.isFinite(tile.height))
                 .sort((a, b) => a.centerY - b.centerY);
-            const averageHeight = tiles.reduce((sum, tile) => sum + tile.height, 0) / Math.max(tiles.length, 1);
-            const rowThreshold = Math.max(24, averageHeight * 0.65);
+            const medianHeight = medianValue(finiteTiles.map((tile) => tile.height));
+            const rowThreshold = Math.max(24, medianHeight * 0.8);
             const rows = [];
 
-            tiles.forEach((tile) => {
+            finiteTiles.forEach((tile) => {
                 const row = rows.find((candidate) => Math.abs(candidate.centerY - tile.centerY) <= rowThreshold);
                 if (row) {
                     row.tiles.push(tile);
@@ -504,9 +572,289 @@
                 }
             });
 
-            return rows
-                .sort((a, b) => a.centerY - b.centerY)
-                .flatMap((row) => row.tiles.sort((a, b) => a.centerX - b.centerX));
+            return rows.sort((a, b) => a.centerY - b.centerY);
+        }
+
+        function splitTilesByGaps(tiles) {
+            const sortedTiles = tiles.slice().sort((a, b) => a.centerX - b.centerX);
+            if (sortedTiles.length <= 1) {
+                return sortedTiles.length ? [sortedTiles] : [];
+            }
+            const medianWidth = medianValue(sortedTiles.map((tile) => tile.width));
+            const gapThreshold = Math.max(36, medianWidth * 1.45);
+            const groups = [[sortedTiles[0]]];
+
+            for (let index = 1; index < sortedTiles.length; index += 1) {
+                const previous = sortedTiles[index - 1];
+                const current = sortedTiles[index];
+                const gap = current.centerX - previous.centerX;
+                const currentGroup = groups[groups.length - 1];
+                if (gap > gapThreshold && currentGroup.length >= 2) {
+                    groups.push([current]);
+                } else {
+                    currentGroup.push(current);
+                }
+            }
+            return groups;
+        }
+
+        function getVisualTileOrder(detections) {
+            const rows = groupTilesByRows(withTileGeometry(detections));
+            return rows.flatMap((row) => row.tiles.sort((a, b) => a.centerX - b.centerX));
+        }
+
+        function isActiveHandTile(tile) {
+            return ACTIVE_HAND_ROLES.has(tile.role) && Boolean(parseTileLabel(tile.label));
+        }
+
+        function buildMeldSelectionFromTiles(tiles, source = "detected") {
+            if (tiles.length !== 3 && tiles.length !== 4) {
+                return null;
+            }
+            const parsedTiles = tiles
+                .map((tile) => {
+                    const parsed = parseTileLabel(tile.label);
+                    return parsed ? { ...parsed, tile } : null;
+                })
+                .filter(Boolean);
+            if (parsedTiles.length !== tiles.length) {
+                return null;
+            }
+
+            const suits = new Set(parsedTiles.map((tile) => tile.suit));
+            if (suits.size !== 1) {
+                return null;
+            }
+
+            const suit = parsedTiles[0].suit;
+            const values = parsedTiles.map((tile) => Number(tile.value)).sort((a, b) => a - b);
+            const sameTile = values.every((value) => value === values[0]);
+            if (tiles.length === 4 && sameTile) {
+                const tileCode = `${values[0]}${suit}`;
+                return {
+                    suit,
+                    type: "m",
+                    code: `m${String(values[0]).repeat(4)}`,
+                    label: `${getTileName(tileCode)} 明槓`,
+                    source,
+                    tileIndexes: tiles.map((tile) => tile.index),
+                };
+            }
+            if (tiles.length === 3 && sameTile) {
+                const tileCode = `${values[0]}${suit}`;
+                return {
+                    suit,
+                    type: "p",
+                    code: `p${String(values[0]).repeat(3)}`,
+                    label: `${getTileName(tileCode)} ポン`,
+                    source,
+                    tileIndexes: tiles.map((tile) => tile.index),
+                };
+            }
+            if (
+                tiles.length === 3 &&
+                suit !== "z" &&
+                values[0] + 1 === values[1] &&
+                values[1] + 1 === values[2]
+            ) {
+                const tileCode = `${values[0]}${suit}`;
+                return {
+                    suit,
+                    type: "c",
+                    code: `c${values[0]}${values[1]}${values[2]}`,
+                    label: `${getTileName(tileCode)}からチー`,
+                    source,
+                    tileIndexes: tiles.map((tile) => tile.index),
+                };
+            }
+            return null;
+        }
+
+        function splitMeldTilesIntoSelections(tiles) {
+            const selections = [];
+            groupTilesByRows(tiles).forEach((row) => {
+                splitTilesByGaps(row.tiles).forEach((group) => {
+                    if (group.length <= 4) {
+                        const meld = buildMeldSelectionFromTiles(group);
+                        if (meld) {
+                            selections.push(meld);
+                        }
+                        return;
+                    }
+
+                    for (let index = 0; index < group.length; index += 3) {
+                        const chunk = group.slice(index, index + 3);
+                        const meld = buildMeldSelectionFromTiles(chunk);
+                        if (meld) {
+                            selections.push(meld);
+                        }
+                    }
+                });
+            });
+            return selections;
+        }
+
+        function inferDetectionRoles(detections) {
+            const tiles = getVisualTileOrder(detections).map((tile) => ({
+                ...tile,
+                role: parseTileLabel(tile.label) ? "hand" : "ignored",
+            }));
+            const geometryTiles = withTileGeometry(tiles).filter((tile) => parseTileLabel(tile.label));
+            const rows = groupTilesByRows(geometryTiles);
+            if (rows.length === 0) {
+                return tiles;
+            }
+
+            const medianHeight = medianValue(geometryTiles.map((tile) => tile.height));
+            const mainRow = rows.reduce((best, row) => {
+                if (!best) {
+                    return row;
+                }
+                if (row.tiles.length > best.tiles.length) {
+                    return row;
+                }
+                if (row.tiles.length === best.tiles.length && row.centerY > best.centerY) {
+                    return row;
+                }
+                return best;
+            }, null);
+            if (geometryTiles.length >= 8 && mainRow.tiles.length < 5) {
+                geometryTiles.forEach((tile) => {
+                    tiles[tile.index].role = "hand";
+                });
+                assignDefaultWinTile(tiles);
+                return tiles;
+            }
+
+            rows.forEach((row) => {
+                const isDoraRow = row !== mainRow && row.centerY < mainRow.centerY - medianHeight * 0.9 && row.tiles.length <= 5;
+                const groups = splitTilesByGaps(row.tiles);
+
+                if (isDoraRow) {
+                    row.tiles.forEach((tile) => {
+                        tiles[tile.index].role = "dora";
+                    });
+                    return;
+                }
+
+                if (row === mainRow) {
+                    const mainGroup = groups.reduce((best, group) => (group.length > best.length ? group : best), groups[0] || []);
+                    groups.forEach((group) => {
+                        const meld = buildMeldSelectionFromTiles(group);
+                        const role = group !== mainGroup && meld ? "meld" : "hand";
+                        group.forEach((tile) => {
+                            tiles[tile.index].role = role;
+                        });
+                    });
+                    return;
+                }
+
+                groups.forEach((group) => {
+                    const meld = buildMeldSelectionFromTiles(group);
+                    group.forEach((tile) => {
+                        tiles[tile.index].role = meld ? "meld" : "ignored";
+                    });
+                });
+            });
+
+            const activeTiles = withTileGeometry(tiles).filter(isActiveHandTile);
+            if (activeTiles.length > 18) {
+                activeTiles
+                    .sort((a, b) => a.confidence - b.confidence)
+                    .slice(0, activeTiles.length - 18)
+                    .forEach((tile) => {
+                        tiles[tile.index].role = "ignored";
+                    });
+            }
+            assignDefaultWinTile(tiles);
+            return tiles;
+        }
+
+        function assignDefaultWinTile(tiles) {
+            const handCandidates = withTileGeometry(tiles).filter((tile) => tile.role === "hand");
+            const activeCandidates = withTileGeometry(tiles).filter(isActiveHandTile);
+            const candidates = handCandidates.length ? handCandidates : activeCandidates;
+            if (candidates.length === 0) {
+                selectedWinIndex = null;
+                return;
+            }
+            const winTile = candidates[candidates.length - 1];
+            tiles[winTile.index].role = "win";
+            selectedWinIndex = winTile.index;
+        }
+
+        function normalizeTileRoles() {
+            detectedTiles.forEach((tile) => {
+                if (!DETECTION_ROLE_LABELS[tile.role]) {
+                    tile.role = "hand";
+                }
+                if (!parseTileLabel(tile.label)) {
+                    tile.role = "ignored";
+                }
+            });
+
+            const activeIndexes = detectedTiles
+                .map((tile, index) => ({ tile, index }))
+                .filter(({ tile }) => isActiveHandTile(tile))
+                .map(({ index }) => index);
+            const winIndexes = activeIndexes.filter((index) => detectedTiles[index].role === "win");
+            let winIndex = null;
+            if (selectedWinIndex !== null && detectedTiles[selectedWinIndex]?.role === "win") {
+                winIndex = selectedWinIndex;
+            } else if (winIndexes.length) {
+                winIndex = winIndexes[0];
+            }
+
+            winIndexes.forEach((index) => {
+                if (index !== winIndex) {
+                    detectedTiles[index].role = "hand";
+                }
+            });
+
+            if (winIndex === null && activeIndexes.length) {
+                const handIndexes = activeIndexes.filter((index) => detectedTiles[index].role === "hand");
+                winIndex = handIndexes.length ? handIndexes[handIndexes.length - 1] : activeIndexes[activeIndexes.length - 1];
+                detectedTiles[winIndex].role = "win";
+            }
+            selectedWinIndex = winIndex;
+        }
+
+        function rebuildSelectionsFromDetectedTiles() {
+            const manualMelds = meldSelections.filter((meld) => meld.source !== "detected");
+            const detectedMelds = splitMeldTilesIntoSelections(
+                withTileGeometry(detectedTiles).filter((tile) => tile.role === "meld")
+            );
+            meldSelections = detectedMelds.concat(manualMelds);
+            syncMeldInputs();
+            renderMeldList();
+
+            const manualDoras = doraSelections.filter((tile) => tile.source !== "detected");
+            const detectedDoras = withTileGeometry(detectedTiles)
+                .filter((tile) => tile.role === "dora")
+                .map((tile) => {
+                    const parsed = parseTileLabel(tile.label);
+                    return {
+                        suit: parsed.suit,
+                        value: parsed.value,
+                        code: tile.label,
+                        source: "detected",
+                        tileIndex: tile.index,
+                    };
+                });
+            doraSelections = detectedDoras.concat(manualDoras);
+            syncDoraInputs();
+            renderDoraList();
+        }
+
+        function refreshDetectionState(message = "") {
+            normalizeTileRoles();
+            rebuildSelectionsFromDetectedTiles();
+            drawDetectionOverlay();
+            renderDetectionControls();
+            applyDetectedTiles();
+            if (message) {
+                setStatus(message);
+            }
         }
 
         function groupedTileText(tiles) {
@@ -533,23 +881,16 @@
         }
 
         function applyDetectedTiles() {
-            if (detectedTiles.length === 0) {
-                Object.values(handInputs).forEach((input) => {
-                    input.value = "";
-                });
-                clearWinInputs();
-                return;
-            }
-
-            const groups = groupedTileText(detectedTiles);
+            const handTiles = detectedTiles.filter(isActiveHandTile);
+            const groups = groupedTileText(handTiles);
             Object.entries(handInputs).forEach(([suit, input]) => {
                 input.value = groups[suit];
             });
 
             clearWinInputs();
-            const winTile = detectedTiles[selectedWinIndex ?? detectedTiles.length - 1];
+            const winTile = selectedWinIndex !== null ? detectedTiles[selectedWinIndex] : null;
             const parsedWinTile = winTile ? parseTileLabel(winTile.label) : null;
-            if (parsedWinTile) {
+            if (parsedWinTile && isActiveHandTile(winTile)) {
                 winInputs[parsedWinTile.suit].value = parsedWinTile.value;
             }
         }
@@ -577,10 +918,14 @@
                 if (!Number.isFinite(detection.x) || !Number.isFinite(detection.y) || !detection.width || !detection.height) {
                     return;
                 }
-                const label = `${getTileName(detection.label)} ${(detection.confidence * 100).toFixed(0)}%`;
-                context.strokeStyle = "#00a86b";
-                context.fillStyle = "rgba(0, 168, 107, 0.82)";
+                const roleLabel = DETECTION_ROLE_LABELS[detection.role] || DETECTION_ROLE_LABELS.hand;
+                const label = `${roleLabel} ${getTileName(detection.label)} ${(detection.confidence * 100).toFixed(0)}%`;
+                const style = DETECTION_ROLE_STYLES[detection.role] || DETECTION_ROLE_STYLES.hand;
+                context.strokeStyle = style.stroke;
+                context.fillStyle = style.fill;
+                context.setLineDash(detection.role === "ignored" ? [8, 5] : []);
                 context.strokeRect(detection.x, detection.y, detection.width, detection.height);
+                context.setLineDash([]);
 
                 const textWidth = context.measureText(label).width + 8;
                 const textHeight = Math.max(18, currentImageSize.width / 32);
@@ -613,18 +958,6 @@
                 meta.className = "tile-meta";
                 meta.textContent = detection.confidence < 1 ? `${(detection.confidence * 100).toFixed(0)}%` : "手動";
 
-                const winButton = document.createElement("button");
-                winButton.type = "button";
-                winButton.className = "win-button";
-                winButton.setAttribute("aria-pressed", index === selectedWinIndex ? "true" : "false");
-                winButton.textContent = index === selectedWinIndex ? "和了" : "和了にする";
-                winButton.addEventListener("click", () => {
-                    selectedWinIndex = index;
-                    renderDetectionControls();
-                    applyDetectedTiles();
-                    setStatus(`${getTileName(detection.label)} を和了牌に設定しました。`);
-                });
-
                 const removeButton = document.createElement("button");
                 removeButton.type = "button";
                 removeButton.className = "remove-tile-button";
@@ -637,17 +970,15 @@
                     } else if (selectedWinIndex !== null && selectedWinIndex > index) {
                         selectedWinIndex -= 1;
                     }
-                    renderDetectionControls();
-                    drawDetectionOverlay();
-                    applyDetectedTiles();
-                    setStatus(`${getTileName(detection.label)} を削除しました。`);
+                    refreshDetectionState(`${getTileName(detection.label)} を削除しました。`);
                 });
 
-                item.append(createTileSelect(detection.label, index), meta, winButton, removeButton);
+                item.append(createTileSelect(detection.label, index), createRoleSelect(detection.role, index), meta, removeButton);
                 editorList.appendChild(item);
             });
             detectionsElement.appendChild(editorList);
-            detectCount.textContent = `${detectedTiles.length}件`;
+            const activeCount = detectedTiles.filter((tile) => tile.role !== "ignored").length;
+            detectCount.textContent = activeCount === detectedTiles.length ? `${detectedTiles.length}件` : `${activeCount}/${detectedTiles.length}件`;
         }
 
         function renderDetections(result) {
@@ -656,12 +987,17 @@
             }
 
             currentImageSize = { width: result.image_width, height: result.image_height };
-            detectedTiles = getVisualTileOrder(result.detections);
-            selectedWinIndex = detectedTiles.length ? detectedTiles.length - 1 : null;
+            detectedTiles = inferDetectionRoles(result.detections);
+            selectedWinIndex = null;
+            normalizeTileRoles();
+            rebuildSelectionsFromDetectedTiles();
             drawDetectionOverlay();
             renderDetectionControls();
             applyDetectedTiles();
-            setStatus(`検出結果: ${detectedTiles.length}件。必要に応じて牌名を修正してください。`);
+            const doraCount = detectedTiles.filter((tile) => tile.role === "dora").length;
+            const detectedMeldCount = meldSelections.filter((meld) => meld.source === "detected").length;
+            const filteredText = result.filtered_detection_count ? `、フィルタ${result.filtered_detection_count}件` : "";
+            setStatus(`検出結果: 手牌${detectedTiles.filter(isActiveHandTile).length}枚、ドラ${doraCount}枚、副露${detectedMeldCount}組${filteredText}。`);
         }
 
         async function detectBlob(blob) {
@@ -721,7 +1057,7 @@
             if (!parsed) {
                 return;
             }
-            doraSelections.push({ suit: parsed.suit, value: parsed.value, code: doraTile.value });
+            doraSelections.push({ suit: parsed.suit, value: parsed.value, code: doraTile.value, source: "manual" });
             syncDoraInputs();
             renderDoraList();
             setStatus(`${getTileName(doraTile.value)} をドラ表示牌に追加しました。`);
@@ -760,13 +1096,9 @@
                 y: Number.NaN,
                 width: 0,
                 height: 0,
+                role: "hand",
             });
-            if (selectedWinIndex === null) {
-                selectedWinIndex = detectedTiles.length - 1;
-            }
-            renderDetectionControls();
-            applyDetectedTiles();
-            setStatus("手動牌を追加しました。牌名を選んで修正してください。");
+            refreshDetectionState("手動牌を追加しました。牌名を選んで修正してください。");
         });
 
         startCameraButton.addEventListener("click", async () => {

@@ -13,7 +13,7 @@
     --danger: #a33939;
 }
 
-* {
+* {a
     box-sizing: border-box;
 }
 
@@ -286,7 +286,7 @@ input[type="checkbox"] {
 
 .tile-editor {
     display: grid;
-    grid-template-columns: minmax(128px, 1fr) 42px 82px 54px;
+    grid-template-columns: minmax(128px, 1fr) 88px 42px 54px;
     align-items: center;
     gap: 8px;
     min-height: 48px;
@@ -296,7 +296,8 @@ input[type="checkbox"] {
     padding: 7px;
 }
 
-.tile-select {
+.tile-select,
+.role-select {
     margin: 0;
 }
 
@@ -643,13 +644,17 @@ input[type="checkbox"] {
         grid-template-columns: minmax(0, 1fr) 52px;
         grid-template-areas:
             "select meta"
-            "win remove";
+            "role remove";
         gap: 7px;
         padding: 8px;
     }
 
     .tile-select {
         grid-area: select;
+    }
+
+    .role-select {
+        grid-area: role;
     }
 
     .tile-meta {
