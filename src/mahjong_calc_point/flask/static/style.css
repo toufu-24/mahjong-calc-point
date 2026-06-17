@@ -151,6 +151,81 @@ body {
     display: none;
 }
 
+.viewer video {
+    z-index: 1;
+}
+
+.viewer canvas {
+    z-index: 2;
+}
+
+.guide-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+}
+
+.guide-zone {
+    position: absolute;
+    left: var(--guide-x);
+    top: var(--guide-y);
+    width: var(--guide-width);
+    height: var(--guide-height);
+    border: 2px dashed rgba(255, 255, 255, 0.82);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(17, 24, 32, 0.3);
+}
+
+.guide-zone span {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.guide-zone-dora {
+    border-color: rgba(139, 92, 246, 0.9);
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.guide-zone-dora span {
+    background: rgba(139, 92, 246, 0.9);
+}
+
+.guide-zone-hand {
+    border-color: rgba(0, 168, 107, 0.9);
+    background: rgba(0, 168, 107, 0.08);
+}
+
+.guide-zone-hand span {
+    background: rgba(0, 168, 107, 0.9);
+}
+
+.guide-zone-meld {
+    border-color: rgba(37, 99, 235, 0.9);
+    background: rgba(37, 99, 235, 0.08);
+}
+
+.guide-zone-meld span {
+    background: rgba(37, 99, 235, 0.9);
+}
+
+.guide-zone-ankan {
+    border-color: rgba(15, 118, 110, 0.9);
+    background: rgba(15, 118, 110, 0.08);
+}
+
+.guide-zone-ankan span {
+    background: rgba(15, 118, 110, 0.9);
+}
+
 .actions,
 .review-actions {
     display: flex;

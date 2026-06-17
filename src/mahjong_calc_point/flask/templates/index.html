@@ -26,6 +26,12 @@
                 <div class="viewer">
                     <video id="cameraPreview" autoplay playsinline muted></video>
                     <canvas id="captureCanvas"></canvas>
+                    <div class="guide-overlay" aria-hidden="true">
+                        <div class="guide-zone guide-zone-dora" data-guide-role="dora"><span>ドラ</span></div>
+                        <div class="guide-zone guide-zone-hand" data-guide-role="hand"><span>手牌</span></div>
+                        <div class="guide-zone guide-zone-meld" data-guide-role="meld"><span>副露</span></div>
+                        <div class="guide-zone guide-zone-ankan" data-guide-role="ankan"><span>暗カン</span></div>
+                    </div>
                 </div>
                 <div class="actions">
                     <button type="button" id="startCameraButton">カメラ開始</button>
@@ -251,6 +257,7 @@
             hand: "手牌",
             win: "和了",
             meld: "副露",
+            ankan: "暗槓",
             dora: "ドラ",
             ignored: "除外",
         };
@@ -258,10 +265,30 @@
             hand: { stroke: "#00a86b", fill: "rgba(0, 168, 107, 0.82)" },
             win: { stroke: "#b7791f", fill: "rgba(183, 121, 31, 0.86)" },
             meld: { stroke: "#2563eb", fill: "rgba(37, 99, 235, 0.84)" },
+            ankan: { stroke: "#0f766e", fill: "rgba(15, 118, 110, 0.84)" },
             dora: { stroke: "#8b5cf6", fill: "rgba(139, 92, 246, 0.84)" },
             ignored: { stroke: "#7b8790", fill: "rgba(123, 135, 144, 0.78)" },
         };
-        const ACTIVE_HAND_ROLES = new Set(["hand", "win", "meld"]);
+        const ACTIVE_HAND_ROLES = new Set(["hand", "win", "meld", "ankan"]);
+        const GUIDE_ZONES = {
+            dora: { x: 0.04, y: 0.04, width: 0.27, height: 0.40 },
+            meld: { x: 0.335, y: 0.04, width: 0.30, height: 0.40 },
+            ankan: { x: 0.66, y: 0.04, width: 0.30, height: 0.40 },
+            hand: { x: 0.04, y: 0.48, width: 0.92, height: 0.46 },
+        };
+
+        function applyGuideZoneStyles() {
+            document.querySelectorAll(".guide-zone[data-guide-role]").forEach((element) => {
+                const zone = GUIDE_ZONES[element.dataset.guideRole];
+                if (!zone) {
+                    return;
+                }
+                element.style.setProperty("--guide-x", `${zone.x * 100}%`);
+                element.style.setProperty("--guide-y", `${zone.y * 100}%`);
+                element.style.setProperty("--guide-width", `${zone.width * 100}%`);
+                element.style.setProperty("--guide-height", `${zone.height * 100}%`);
+            });
+        }
 
         function setStatus(message) {
             detectStatus.textContent = message;
@@ -607,7 +634,68 @@
             return ACTIVE_HAND_ROLES.has(tile.role) && Boolean(parseTileLabel(tile.label));
         }
 
-        function buildMeldSelectionFromTiles(tiles, source = "detected") {
+        function isTileInsideGuideZone(tile, zone) {
+            if (!currentImageSize.width || !currentImageSize.height) {
+                return false;
+            }
+            const centerX = tile.centerX / currentImageSize.width;
+            const centerY = tile.centerY / currentImageSize.height;
+            return (
+                centerX >= zone.x &&
+                centerX <= zone.x + zone.width &&
+                centerY >= zone.y &&
+                centerY <= zone.y + zone.height
+            );
+        }
+
+        function getGuideZoneRole(tile) {
+            if (isTileInsideGuideZone(tile, GUIDE_ZONES.dora)) {
+                return "dora";
+            }
+            if (isTileInsideGuideZone(tile, GUIDE_ZONES.meld)) {
+                return "meld";
+            }
+            if (isTileInsideGuideZone(tile, GUIDE_ZONES.ankan)) {
+                return "ankan";
+            }
+            if (isTileInsideGuideZone(tile, GUIDE_ZONES.hand)) {
+                return "hand";
+            }
+            return null;
+        }
+
+        function applyGuideZoneRoles(tiles, geometryTiles) {
+            const zoneTiles = { hand: [], meld: [], ankan: [], dora: [] };
+            geometryTiles.forEach((tile) => {
+                const role = getGuideZoneRole(tile);
+                if (role) {
+                    zoneTiles[role].push(tile);
+                }
+            });
+
+            if (zoneTiles.hand.length < 5) {
+                return false;
+            }
+
+            tiles.forEach((tile) => {
+                tile.role = "ignored";
+            });
+            zoneTiles.hand.forEach((tile) => {
+                tiles[tile.index].role = "hand";
+            });
+            zoneTiles.dora.forEach((tile) => {
+                tiles[tile.index].role = "dora";
+            });
+            zoneTiles.meld.forEach((tile) => {
+                tiles[tile.index].role = "meld";
+            });
+            zoneTiles.ankan.forEach((tile) => {
+                tiles[tile.index].role = "ankan";
+            });
+            return true;
+        }
+
+        function buildMeldSelectionFromTiles(tiles, source = "detected", meldRole = "meld") {
             if (tiles.length !== 3 && tiles.length !== 4) {
                 return null;
             }
@@ -631,11 +719,12 @@
             const sameTile = values.every((value) => value === values[0]);
             if (tiles.length === 4 && sameTile) {
                 const tileCode = `${values[0]}${suit}`;
+                const type = meldRole === "ankan" ? "a" : "m";
                 return {
                     suit,
-                    type: "m",
-                    code: `m${String(values[0]).repeat(4)}`,
-                    label: `${getTileName(tileCode)} 明槓`,
+                    type,
+                    code: `${type}${String(values[0]).repeat(4)}`,
+                    label: `${getTileName(tileCode)} ${MELD_TYPE_LABELS[type]}`,
                     source,
                     tileIndexes: tiles.map((tile) => tile.index),
                 };
@@ -675,7 +764,8 @@
             groupTilesByRows(tiles).forEach((row) => {
                 splitTilesByGaps(row.tiles).forEach((group) => {
                     if (group.length <= 4) {
-                        const meld = buildMeldSelectionFromTiles(group);
+                        const meldRole = group.every((tile) => tile.role === "ankan") ? "ankan" : "meld";
+                        const meld = buildMeldSelectionFromTiles(group, "detected", meldRole);
                         if (meld) {
                             selections.push(meld);
                         }
@@ -684,7 +774,8 @@
 
                     for (let index = 0; index < group.length; index += 3) {
                         const chunk = group.slice(index, index + 3);
-                        const meld = buildMeldSelectionFromTiles(chunk);
+                        const meldRole = chunk.every((tile) => tile.role === "ankan") ? "ankan" : "meld";
+                        const meld = buildMeldSelectionFromTiles(chunk, "detected", meldRole);
                         if (meld) {
                             selections.push(meld);
                         }
@@ -702,6 +793,11 @@
             const geometryTiles = withTileGeometry(tiles).filter((tile) => parseTileLabel(tile.label));
             const rows = groupTilesByRows(geometryTiles);
             if (rows.length === 0) {
+                return tiles;
+            }
+
+            if (applyGuideZoneRoles(tiles, geometryTiles)) {
+                assignDefaultWinTile(tiles);
                 return tiles;
             }
 
@@ -822,7 +918,7 @@
         function rebuildSelectionsFromDetectedTiles() {
             const manualMelds = meldSelections.filter((meld) => meld.source !== "detected");
             const detectedMelds = splitMeldTilesIntoSelections(
-                withTileGeometry(detectedTiles).filter((tile) => tile.role === "meld")
+                withTileGeometry(detectedTiles).filter((tile) => tile.role === "meld" || tile.role === "ankan")
             );
             meldSelections = detectedMelds.concat(manualMelds);
             syncMeldInputs();
@@ -1154,6 +1250,7 @@
             image.src = URL.createObjectURL(file);
         });
 
+        applyGuideZoneStyles();
         initializeOptionalTileInputs();
     </script>
 </body>
