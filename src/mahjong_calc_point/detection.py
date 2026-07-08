@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 import threading
@@ -21,13 +22,19 @@ os.environ.setdefault("YOLO_CONFIG_DIR", tempfile.gettempdir())
 MODEL_PATH = Path(__file__).resolve().parent / "yolo" / "best.pt"
 DEFAULT_DUPLICATE_IOU_THRESHOLD = 0.75
 DEFAULT_DUPLICATE_CONTAINMENT_THRESHOLD = 0.9
-DEFAULT_MIN_DETECTOR_CONFIDENCE = 0.25
+DEFAULT_MIN_DETECTOR_CONFIDENCE = 0.3
 DEFAULT_MIN_CLASSIFIER_CONFIDENCE = 0.35
-DEFAULT_MIN_SIZE_RATIO = 0.35
+DEFAULT_MIN_SIZE_RATIO = 0.5
 DEFAULT_MAX_SIZE_RATIO = 2.85
 DEFAULT_MAX_DETECTIONS = 24
-VALID_TILE_LABELS = set(TILE_LABELS)
+DEFAULT_ENABLE_BLACK_TILE_AUGMENTATION = True
+DEFAULT_RED_FIVE_MIN_RATIO = 0.018
+DEFAULT_CLASSIFIER_DETECTOR_FALLBACK_CONFIDENCE = 0.6
+DEFAULT_CLASSIFIER_DETECTOR_FALLBACK_MIN_DETECTOR_CONFIDENCE = 0.75
+RED_FIVE_LABELS = {"0m", "0p", "0s"}
+VALID_TILE_LABELS = set(TILE_LABELS) | RED_FIVE_LABELS
 
+logger = logging.getLogger(__name__)
 _model: Any | None = None
 _model_lock = threading.Lock()
 
@@ -73,10 +80,7 @@ def detect_tiles(image_bytes: bytes) -> dict[str, Any]:
     height, width = image.shape[:2]
     model = _load_model()
 
-    with _model_lock:
-        results = model(image)
-
-    names = getattr(results, "names", {})
+    names: dict[int, str] | list[str] | tuple[str, ...] = {}
     classifier = load_classifier()
     require_classifier = os.environ.get("MAHJONG_REQUIRE_TILE_CLASSIFIER") == "1"
     if require_classifier and classifier is None:
@@ -86,6 +90,46 @@ def detect_tiles(image_bytes: bytes) -> dict[str, Any]:
             "src/mahjong_calc_point/classifier/tile_classifier.pt."
         )
 
+    detections = []
+    for variant_name, variant_image in _iter_detection_images(image):
+        with _model_lock:
+            results = model(variant_image)
+        names = getattr(results, "names", names)
+        detections.extend(
+            _detections_from_results(
+                image,
+                results,
+                names,
+                classifier,
+                variant_name,
+            )
+        )
+
+    raw_detection_count = len(detections)
+    detections = _filter_valid_tile_detections(detections)
+    detections = _suppress_duplicate_detections(detections)
+    detections = _filter_size_outliers(detections)
+    detections = _limit_detection_count(detections)
+    detections.sort(key=lambda item: (item["y"], item["x"]))
+    _log_detector_label_fallbacks(detections)
+    return {
+        "image_width": width,
+        "image_height": height,
+        "classifier_available": classifier is not None and classifier_exists(),
+        "black_tile_augmentation_enabled": _black_tile_augmentation_enabled(),
+        "raw_detection_count": raw_detection_count,
+        "filtered_detection_count": raw_detection_count - len(detections),
+        "detections": detections,
+    }
+
+
+def _detections_from_results(
+    classification_image: np.ndarray,
+    results: Any,
+    names: dict[int, str] | list[str] | tuple[str, ...],
+    classifier: Any | None,
+    image_variant: str,
+) -> list[dict[str, Any]]:
     detections = []
     for row in results.xyxy[0].tolist():
         xmin, ymin, xmax, ymax, confidence, class_id = row
@@ -99,44 +143,142 @@ def detect_tiles(image_bytes: bytes) -> dict[str, Any]:
         classification_confidence: float | None = None
         classification_source = "detector_fallback"
 
-        tile_crop = crop_tile(image, xmin, ymin, xmax, ymax)
+        tile_crop = crop_tile(classification_image, xmin, ymin, xmax, ymax)
         if classifier is not None and tile_crop is not None:
             classification = classifier.classify(tile_crop)
             label = classification.label
             classification_confidence = classification.confidence
             classification_source = "classifier"
+            if _should_fallback_to_detector_label(
+                detector_label,
+                classification_confidence,
+                float(confidence),
+            ):
+                label = detector_label
+                classification_source = "detector_low_classifier_confidence_fallback"
 
+        red_dora_detected = False
+        if tile_crop is not None:
+            red_label = _detect_red_five_label(label, tile_crop)
+            if red_label is not None:
+                label = red_label
+                red_dora_detected = True
+
+        reported_confidence = (
+            classification_confidence
+            if classification_source == "classifier"
+            and classification_confidence is not None
+            else float(confidence)
+        )
         detections.append(
             {
                 "label": label,
-                "confidence": classification_confidence
-                if classification_confidence is not None
-                else float(confidence),
+                "red_dora": red_dora_detected,
+                "confidence": reported_confidence,
                 "detector_label": detector_label,
                 "detector_confidence": float(confidence),
                 "classifier_confidence": classification_confidence,
                 "classification_source": classification_source,
+                "image_variant": image_variant,
                 "x": float(xmin),
                 "y": float(ymin),
                 "width": float(xmax - xmin),
                 "height": float(ymax - ymin),
             }
         )
+    return detections
 
-    raw_detection_count = len(detections)
-    detections = _filter_valid_tile_detections(detections)
-    detections = _suppress_duplicate_detections(detections)
-    detections = _filter_size_outliers(detections)
-    detections = _limit_detection_count(detections)
-    detections.sort(key=lambda item: (item["y"], item["x"]))
-    return {
-        "image_width": width,
-        "image_height": height,
-        "classifier_available": classifier is not None and classifier_exists(),
-        "raw_detection_count": raw_detection_count,
-        "filtered_detection_count": raw_detection_count - len(detections),
-        "detections": detections,
-    }
+
+def _log_detector_label_fallbacks(detections: list[dict[str, Any]]) -> None:
+    for detection in detections:
+        if (
+            detection.get("classification_source")
+            != "detector_low_classifier_confidence_fallback"
+        ):
+            continue
+        logger.warning(
+            "tile classifier fallback to YOLO label: "
+            "variant=%s label=%s classifier_confidence=%.3f "
+            "detector_confidence=%.3f bbox=(%.1f, %.1f, %.1f, %.1f)",
+            detection.get("image_variant", "unknown"),
+            detection.get("label", "unknown"),
+            float(detection.get("classifier_confidence", 0.0)),
+            float(detection.get("detector_confidence", 0.0)),
+            float(detection.get("x", 0.0)),
+            float(detection.get("y", 0.0)),
+            float(detection.get("width", 0.0)),
+            float(detection.get("height", 0.0)),
+        )
+
+
+def _iter_detection_images(image: np.ndarray) -> Iterator[tuple[str, np.ndarray]]:
+    yield "original", image
+    if not _black_tile_augmentation_enabled():
+        return
+
+    yield "inverted", cv2.bitwise_not(image)
+    yield "contrast", _enhance_dark_tile_contrast(image)
+
+
+def _black_tile_augmentation_enabled() -> bool:
+    value = os.environ.get("MAHJONG_ENABLE_BLACK_TILE_AUGMENTATION")
+    if value is None:
+        return DEFAULT_ENABLE_BLACK_TILE_AUGMENTATION
+    return value.lower() not in {"0", "false", "no", "off"}
+
+
+def _enhance_dark_tile_contrast(image: np.ndarray) -> np.ndarray:
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l_channel, a_channel, b_channel = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced_l = clahe.apply(l_channel)
+    enhanced = cv2.merge((enhanced_l, a_channel, b_channel))
+    return cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
+
+
+def _should_fallback_to_detector_label(
+    detector_label: str,
+    classifier_confidence: float,
+    detector_confidence: float,
+) -> bool:
+    if detector_label not in VALID_TILE_LABELS:
+        return False
+    if classifier_confidence >= _get_float_env(
+        "MAHJONG_CLASSIFIER_DETECTOR_FALLBACK_CONFIDENCE",
+        DEFAULT_CLASSIFIER_DETECTOR_FALLBACK_CONFIDENCE,
+    ):
+        return False
+    return detector_confidence >= _get_float_env(
+        "MAHJONG_CLASSIFIER_DETECTOR_FALLBACK_MIN_DETECTOR_CONFIDENCE",
+        DEFAULT_CLASSIFIER_DETECTOR_FALLBACK_MIN_DETECTOR_CONFIDENCE,
+    )
+
+
+def _detect_red_five_label(label: str, crop_bgr: np.ndarray) -> str | None:
+    if label not in {"5m", "5p", "5s"}:
+        return None
+    if _red_pixel_ratio(crop_bgr) < _get_float_env(
+        "MAHJONG_RED_FIVE_MIN_RATIO", DEFAULT_RED_FIVE_MIN_RATIO
+    ):
+        return None
+    return f"0{label[1]}"
+
+
+def _red_pixel_ratio(crop_bgr: np.ndarray) -> float:
+    if crop_bgr.size == 0:
+        return 0.0
+
+    hsv = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2HSV)
+    red_low = cv2.inRange(hsv, (0, 65, 45), (12, 255, 255))
+    red_high = cv2.inRange(hsv, (168, 65, 45), (179, 255, 255))
+    red_mask = cv2.bitwise_or(red_low, red_high)
+
+    gray = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2GRAY)
+    non_background = gray < 245
+    denominator = int(np.count_nonzero(non_background))
+    if denominator <= 0:
+        denominator = crop_bgr.shape[0] * crop_bgr.shape[1]
+    return float(np.count_nonzero(red_mask)) / float(denominator)
 
 
 def _get_float_env(name: str, default: float) -> float:
@@ -187,7 +329,8 @@ def _filter_valid_tile_detections(
             continue
         classifier_confidence = detection.get("classifier_confidence")
         if (
-            classifier_confidence is not None
+            detection.get("classification_source") == "classifier"
+            and classifier_confidence is not None
             and float(classifier_confidence) < min_classifier_confidence
         ):
             continue
@@ -264,7 +407,10 @@ def _limit_detection_count(
 
 def _detection_score(detection: dict[str, Any]) -> float:
     classifier_confidence = detection.get("classifier_confidence")
-    if classifier_confidence is not None:
+    if (
+        detection.get("classification_source") == "classifier"
+        and classifier_confidence is not None
+    ):
         return float(classifier_confidence) * float(
             detection.get("detector_confidence", 0.0)
         )

@@ -33,11 +33,18 @@
                         <div class="guide-zone guide-zone-ankan" data-guide-role="ankan"><span>暗カン</span></div>
                     </div>
                 </div>
+                <div class="camera-controls">
+                    <label for="cameraSelect">カメラ
+                        <select id="cameraSelect" disabled>
+                            <option value="">自動選択</option>
+                        </select>
+                    </label>
+                </div>
                 <div class="actions">
                     <button type="button" id="startCameraButton">カメラ開始</button>
                     <button type="button" id="captureButton" disabled>認識</button>
                     <label class="file-button" for="imageUpload">画像を選択</label>
-                    <input type="file" id="imageUpload" accept="image/*">
+                    <input type="file" id="imageUpload" accept="image/*" capture="environment">
                 </div>
             </section>
 
@@ -50,6 +57,43 @@
                         </div>
                     </div>
                     <div id="detections" class="detections empty">未認識</div>
+                    <div class="recognition-options">
+                        <div class="option-section">
+                            <div class="option-header">
+                                <h3>副露</h3>
+                                <span class="option-note">認識結果に追加・修正</span>
+                            </div>
+                            <div class="builder-row">
+                                <label for="meldType">種類
+                                    <select id="meldType">
+                                        <option value="c">チー</option>
+                                        <option value="p">ポン</option>
+                                        <option value="a">暗槓</option>
+                                        <option value="m">明槓</option>
+                                    </select>
+                                </label>
+                                <label for="meldTile">牌
+                                    <select id="meldTile"></select>
+                                </label>
+                                <button type="button" id="addMeldButton" class="secondary-button builder-button">追加</button>
+                            </div>
+                            <div id="meldList" class="chip-list empty">副露なし</div>
+                        </div>
+
+                        <div class="option-section">
+                            <div class="option-header">
+                                <h3>ドラ表示牌</h3>
+                                <span class="option-note">認識されたドラもここに入ります</span>
+                            </div>
+                            <div class="builder-row dora-builder-row">
+                                <label for="doraTile">牌
+                                    <select id="doraTile"></select>
+                                </label>
+                                <button type="button" id="addDoraButton" class="secondary-button builder-button">追加</button>
+                            </div>
+                            <div id="doraList" class="chip-list empty">ドラ表示牌なし</div>
+                        </div>
+                    </div>
                 </section>
 
         <form method="post" id="scoreForm" class="score-form">
@@ -63,56 +107,23 @@
             <input type="hidden" id="win_sou" name="win_sou" value="{{ win_tile_str.sou }}">
             <input type="hidden" id="win_honors" name="win_honors" value="{{ win_tile_str.honors }}">
 
+            <input type="hidden" id="melds_man" name="melds_man" value="{{ melds_str.man }}">
+            <input type="hidden" id="melds_pin" name="melds_pin" value="{{ melds_str.pin }}">
+            <input type="hidden" id="melds_sou" name="melds_sou" value="{{ melds_str.sou }}">
+            <input type="hidden" id="melds_honors" name="melds_honors" value="{{ melds_str.honors }}">
+
+            <input type="hidden" id="dora_man" name="dora_man" value="{{ dora_indicators_str.man }}">
+            <input type="hidden" id="dora_pin" name="dora_pin" value="{{ dora_indicators_str.pin }}">
+            <input type="hidden" id="dora_sou" name="dora_sou" value="{{ dora_indicators_str.sou }}">
+            <input type="hidden" id="dora_honors" name="dora_honors" value="{{ dora_indicators_str.honors }}">
+
             <div class="advanced-panel">
                 <div class="advanced-summary">
                     <span class="summary-copy">
-                        <span class="summary-title">副露・ドラ・状況役</span>
+                        <span class="summary-title">状況役</span>
                     </span>
                 </div>
                 <div class="advanced-content">
-                    <div class="option-section">
-                        <div class="option-header">
-                            <h3>副露</h3>
-                            <span class="option-note">種類と牌を選んで追加</span>
-                        </div>
-                        <input type="hidden" id="melds_man" name="melds_man" value="{{ melds_str.man }}">
-                        <input type="hidden" id="melds_pin" name="melds_pin" value="{{ melds_str.pin }}">
-                        <input type="hidden" id="melds_sou" name="melds_sou" value="{{ melds_str.sou }}">
-                        <input type="hidden" id="melds_honors" name="melds_honors" value="{{ melds_str.honors }}">
-                        <div class="builder-row">
-                            <label for="meldType">種類
-                                <select id="meldType">
-                                    <option value="c">チー</option>
-                                    <option value="p">ポン</option>
-                                    <option value="a">暗槓</option>
-                                    <option value="m">明槓</option>
-                                </select>
-                            </label>
-                            <label for="meldTile">牌
-                                <select id="meldTile"></select>
-                            </label>
-                            <button type="button" id="addMeldButton" class="secondary-button builder-button">追加</button>
-                        </div>
-                        <div id="meldList" class="chip-list empty">副露なし</div>
-                    </div>
-
-                    <div class="option-section">
-                        <div class="option-header">
-                            <h3>ドラ表示牌</h3>
-                        </div>
-                        <input type="hidden" id="dora_man" name="dora_man" value="{{ dora_indicators_str.man }}">
-                        <input type="hidden" id="dora_pin" name="dora_pin" value="{{ dora_indicators_str.pin }}">
-                        <input type="hidden" id="dora_sou" name="dora_sou" value="{{ dora_indicators_str.sou }}">
-                        <input type="hidden" id="dora_honors" name="dora_honors" value="{{ dora_indicators_str.honors }}">
-                        <div class="builder-row dora-builder-row">
-                            <label for="doraTile">牌
-                                <select id="doraTile"></select>
-                            </label>
-                            <button type="button" id="addDoraButton" class="secondary-button builder-button">追加</button>
-                        </div>
-                        <div id="doraList" class="chip-list empty">ドラ表示牌なし</div>
-                    </div>
-
                     <div class="option-section">
                         <div class="option-header">
                             <h3>状況役</h3>
@@ -161,6 +172,7 @@
         const context = canvas.getContext("2d");
         const startCameraButton = document.getElementById("startCameraButton");
         const captureButton = document.getElementById("captureButton");
+        const cameraSelect = document.getElementById("cameraSelect");
         const imageUpload = document.getElementById("imageUpload");
         const detectStatus = document.getElementById("detectStatus");
         const detectCount = document.getElementById("detectCount");
@@ -211,6 +223,7 @@
         let currentImageSize = { width: 0, height: 0 };
         let meldSelections = [];
         let doraSelections = [];
+        let cameraStream = null;
 
         const TILE_OPTIONS = [
             {
@@ -218,21 +231,21 @@
                 tiles: Array.from({ length: 9 }, (_, index) => {
                     const value = String(index + 1);
                     return { code: `${value}m`, name: `${["一", "二", "三", "四", "五", "六", "七", "八", "九"][index]}萬` };
-                }),
+                }).flatMap((tile) => tile.code === "5m" ? [tile, { code: "0m", name: "赤五萬" }] : [tile]),
             },
             {
                 name: "筒子",
                 tiles: Array.from({ length: 9 }, (_, index) => {
                     const value = String(index + 1);
                     return { code: `${value}p`, name: `${["一", "二", "三", "四", "五", "六", "七", "八", "九"][index]}筒` };
-                }),
+                }).flatMap((tile) => tile.code === "5p" ? [tile, { code: "0p", name: "赤五筒" }] : [tile]),
             },
             {
                 name: "索子",
                 tiles: Array.from({ length: 9 }, (_, index) => {
                     const value = String(index + 1);
                     return { code: `${value}s`, name: `${["一", "二", "三", "四", "五", "六", "七", "八", "九"][index]}索` };
-                }),
+                }).flatMap((tile) => tile.code === "5s" ? [tile, { code: "0s", name: "赤五索" }] : [tile]),
             },
             {
                 name: "字牌",
@@ -269,7 +282,7 @@
             dora: { stroke: "#8b5cf6", fill: "rgba(139, 92, 246, 0.84)" },
             ignored: { stroke: "#7b8790", fill: "rgba(123, 135, 144, 0.78)" },
         };
-        const ACTIVE_HAND_ROLES = new Set(["hand", "win", "meld", "ankan"]);
+        const ACTIVE_HAND_ROLES = new Set(["hand", "win"]);
         const GUIDE_ZONES = {
             dora: { x: 0.04, y: 0.04, width: 0.27, height: 0.40 },
             meld: { x: 0.335, y: 0.04, width: 0.30, height: 0.40 },
@@ -299,12 +312,97 @@
             detectCount.textContent = "失敗";
         }
 
+        function canUseBrowserCamera() {
+            return window.isSecureContext || ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+        }
+
+        function applyCameraAvailability() {
+            if (canUseBrowserCamera()) {
+                return;
+            }
+            startCameraButton.disabled = true;
+            cameraSelect.disabled = true;
+            startCameraButton.title = "HTTP接続ではブラウザのカメラ起動が制限されます";
+            setStatus("スマホでは「画像を選択」から撮影してください。");
+        }
+
+        function stopCameraStream() {
+            if (!cameraStream) {
+                return;
+            }
+            cameraStream.getTracks().forEach((track) => track.stop());
+            cameraStream = null;
+        }
+
+        function formatCameraLabel(device, index) {
+            if (device.label) {
+                return device.label;
+            }
+            return index === 0 ? "カメラ 1" : `カメラ ${index + 1}`;
+        }
+
+        async function refreshCameraOptions(selectedDeviceId = "") {
+            if (!navigator.mediaDevices?.enumerateDevices) {
+                cameraSelect.disabled = true;
+                return;
+            }
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoInputs = devices.filter((device) => device.kind === "videoinput");
+            cameraSelect.innerHTML = "";
+
+            if (videoInputs.length === 0) {
+                cameraSelect.appendChild(createOption("", "カメラなし", ""));
+                cameraSelect.disabled = true;
+                return;
+            }
+
+            videoInputs.forEach((device, index) => {
+                cameraSelect.appendChild(
+                    createOption(device.deviceId, formatCameraLabel(device, index), selectedDeviceId)
+                );
+            });
+            cameraSelect.disabled = videoInputs.length <= 1;
+        }
+
+        async function startCamera(deviceId = "") {
+            if (!canUseBrowserCamera()) {
+                setStatus("HTTP接続ではカメラ開始を使えません。「画像を選択」から撮影してください。");
+                return;
+            }
+
+            const videoConstraint = deviceId
+                ? { deviceId: { exact: deviceId } }
+                : { facingMode: { ideal: "environment" } };
+
+            stopCameraStream();
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: videoConstraint,
+                audio: false,
+            });
+
+            cameraStream = stream;
+            video.srcObject = stream;
+            video.style.display = "block";
+            captureButton.disabled = false;
+
+            const track = stream.getVideoTracks()[0];
+            const activeDeviceId = track?.getSettings?.().deviceId || deviceId;
+            await refreshCameraOptions(activeDeviceId);
+            if (activeDeviceId) {
+                cameraSelect.value = activeDeviceId;
+            }
+            setStatus("カメラを起動しました。");
+        }
+
         function parseTileLabel(label) {
-            const match = /^([1-9])([mpsz])$/.exec(label);
+            const match = /^([0-9])([mps])$|^([1-7])(z)$/.exec(label);
             if (!match) {
                 return null;
             }
-            return { value: match[1], suit: match[2] };
+            const value = match[1] || match[3];
+            const suit = match[2] || match[4];
+            return { value, suit, rank: value === "0" ? "5" : value, isRed: value === "0" };
         }
 
         function getTileName(label) {
@@ -325,12 +423,15 @@
             return option;
         }
 
-        function appendTileOptions(select, selectedValue = "") {
+        function appendTileOptions(select, selectedValue = "", { includeRed = true } = {}) {
             select.innerHTML = "";
             TILE_OPTIONS.forEach((group) => {
                 const optgroup = document.createElement("optgroup");
                 optgroup.label = group.name;
                 group.tiles.forEach((tile) => {
+                    if (!includeRed && tile.code.startsWith("0")) {
+                        return;
+                    }
                     optgroup.appendChild(createOption(tile.code, tile.name, selectedValue));
                 });
                 select.appendChild(optgroup);
@@ -347,7 +448,7 @@
                 optgroup.label = group.name;
                 group.tiles.forEach((tile) => {
                     const parsed = parseTileLabel(tile.code);
-                    if (!parsed || (isChi && Number(parsed.value) > 7)) {
+                    if (!parsed || parsed.isRed || (isChi && Number(parsed.rank) > 7)) {
                         return;
                     }
                     const label = isChi ? `${getTileName(tile.code)}から` : tile.name;
@@ -363,7 +464,7 @@
                 return null;
             }
             if (type === "c") {
-                const start = Number(parsed.value);
+                const start = Number(parsed.rank);
                 if (parsed.suit === "z" || start > 7) {
                     return null;
                 }
@@ -377,7 +478,7 @@
             const count = type === "p" ? 3 : 4;
             return {
                 suit: parsed.suit,
-                code: `${type}${parsed.value.repeat(count)}`,
+                code: `${type}${parsed.rank.repeat(count)}`,
                 label: `${getTileName(tileCode)} ${MELD_TYPE_LABELS[type]}`,
                 source: "manual",
             };
@@ -506,7 +607,7 @@
 
         function initializeOptionalTileInputs() {
             appendMeldTileOptions();
-            appendTileOptions(doraTile);
+            appendTileOptions(doraTile, "", { includeRed: false });
             parseMeldSelectionsFromInputs();
             parseDoraSelectionsFromInputs();
             syncMeldInputs();
@@ -634,6 +735,10 @@
             return ACTIVE_HAND_ROLES.has(tile.role) && Boolean(parseTileLabel(tile.label));
         }
 
+        function tileSortRank(value) {
+            return Number(value === "0" ? "5" : value);
+        }
+
         function isTileInsideGuideZone(tile, zone) {
             if (!currentImageSize.width || !currentImageSize.height) {
                 return false;
@@ -715,7 +820,7 @@
             }
 
             const suit = parsedTiles[0].suit;
-            const values = parsedTiles.map((tile) => Number(tile.value)).sort((a, b) => a - b);
+            const values = parsedTiles.map((tile) => Number(tile.rank)).sort((a, b) => a - b);
             const sameTile = values.every((value) => value === values[0]);
             if (tiles.length === 4 && sameTile) {
                 const tileCode = `${values[0]}${suit}`;
@@ -761,6 +866,54 @@
 
         function splitMeldTilesIntoSelections(tiles) {
             const selections = [];
+            const roleTiles = {
+                meld: tiles.filter((tile) => tile.role === "meld"),
+                ankan: tiles.filter((tile) => tile.role === "ankan"),
+            };
+
+            const addSameTileSelections = (candidates, role) => {
+                const byLabel = new Map();
+                candidates.forEach((tile) => {
+                    if (!parseTileLabel(tile.label)) {
+                        return;
+                    }
+                    if (!byLabel.has(tile.label)) {
+                        byLabel.set(tile.label, []);
+                    }
+                    byLabel.get(tile.label).push(tile);
+                });
+
+                byLabel.forEach((sameTiles) => {
+                    sameTiles.sort((a, b) => a.centerX - b.centerX);
+                    if (role === "ankan" && sameTiles.length >= 4) {
+                        const meld = buildMeldSelectionFromTiles(sameTiles.slice(0, 4), "detected", "ankan");
+                        if (meld) {
+                            selections.push(meld);
+                        }
+                        return;
+                    }
+                    if (role === "meld" && sameTiles.length >= 4) {
+                        const meld = buildMeldSelectionFromTiles(sameTiles.slice(0, 4), "detected", "meld");
+                        if (meld) {
+                            selections.push(meld);
+                        }
+                        return;
+                    }
+                    if (role === "meld" && sameTiles.length >= 3) {
+                        const meld = buildMeldSelectionFromTiles(sameTiles.slice(0, 3), "detected", "meld");
+                        if (meld) {
+                            selections.push(meld);
+                        }
+                    }
+                });
+            };
+
+            addSameTileSelections(roleTiles.ankan, "ankan");
+            addSameTileSelections(roleTiles.meld, "meld");
+            if (selections.length > 0) {
+                return selections;
+            }
+
             groupTilesByRows(tiles).forEach((row) => {
                 splitTilesByGaps(row.tiles).forEach((group) => {
                     if (group.length <= 4) {
@@ -961,7 +1114,7 @@
                     groups[parsed.suit].push(parsed.value);
                 }
             });
-            Object.values(groups).forEach((values) => values.sort((a, b) => Number(a) - Number(b)));
+            Object.values(groups).forEach((values) => values.sort((a, b) => tileSortRank(a) - tileSortRank(b)));
             return {
                 m: groups.m.join(""),
                 p: groups.p.join(""),
@@ -988,6 +1141,47 @@
             const parsedWinTile = winTile ? parseTileLabel(winTile.label) : null;
             if (parsedWinTile && isActiveHandTile(winTile)) {
                 winInputs[parsedWinTile.suit].value = parsedWinTile.value;
+            }
+        }
+
+        function clearCalculationInputs() {
+            Object.values(handInputs).forEach((input) => {
+                input.value = "";
+            });
+            clearWinInputs();
+            Object.values(meldInputs).forEach((input) => {
+                input.value = "";
+            });
+            Object.values(doraInputs).forEach((input) => {
+                input.value = "";
+            });
+        }
+
+        function resetRecognitionState(message = "") {
+            latestImage = null;
+            detectedTiles = [];
+            selectedWinIndex = null;
+            currentImageSize = { width: 0, height: 0 };
+            meldSelections = [];
+            doraSelections = [];
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.style.display = "none";
+            detectionsElement.textContent = "未認識";
+            detectionsElement.classList.add("empty");
+            detectCount.textContent = "未認識";
+            scoreResult.classList.add("empty");
+            resultYaku.textContent = "役: -";
+            resultHan.textContent = "翻: -";
+            resultFu.textContent = "符: -";
+            resultCost.textContent = "点数: -";
+            resultPayment.textContent = "支払い: -";
+            clearCalculationInputs();
+            syncMeldInputs();
+            syncDoraInputs();
+            renderMeldList();
+            renderDoraList();
+            if (message) {
+                setStatus(message);
             }
         }
 
@@ -1123,6 +1317,7 @@
                 resultCost.textContent = `点数: ${result.cost ?? "-"}`;
                 resultPayment.textContent = `支払い: ${result.payment || "-"}`;
                 setStatus("点数計算が完了しました。");
+                scoreResult.scrollIntoView({ behavior: "smooth", block: "nearest" });
                 return;
             }
 
@@ -1132,6 +1327,7 @@
             resultCost.textContent = "点数: -";
             resultPayment.textContent = "支払い: -";
             setStatus("点数計算に失敗しました。入力を確認してください。");
+            scoreResult.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
 
         meldType.addEventListener("change", appendMeldTileOptions);
@@ -1199,16 +1395,18 @@
 
         startCameraButton.addEventListener("click", async () => {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment" },
-                    audio: false,
-                });
-                video.srcObject = stream;
-                video.style.display = "block";
-                captureButton.disabled = false;
-                setStatus("カメラを起動しました。");
+                resetRecognitionState("カメラを起動中...");
+                await startCamera(cameraSelect.value);
             } catch (error) {
                 setStatus(`カメラを起動できません: ${error.message}`);
+            }
+        });
+
+        cameraSelect.addEventListener("change", async () => {
+            try {
+                await startCamera(cameraSelect.value);
+            } catch (error) {
+                setStatus(`カメラを切り替えられません: ${error.message}`);
             }
         });
 
@@ -1252,6 +1450,12 @@
 
         applyGuideZoneStyles();
         initializeOptionalTileInputs();
+        applyCameraAvailability();
+        if (canUseBrowserCamera()) {
+            refreshCameraOptions().catch(() => {
+                cameraSelect.disabled = true;
+            });
+        }
     </script>
 </body>
 

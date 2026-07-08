@@ -1,0 +1,12 @@
+services:
+  - type: web
+    runtime: docker
+    name: mahjong-calc-point
+    plan: starter
+    dockerfilePath: ./Dockerfile.render
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: MAHJONG_ENABLE_BLACK_TILE_AUGMENTATION
+        value: "1"

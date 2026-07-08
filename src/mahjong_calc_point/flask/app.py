@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, jsonify, render_template, request
 from mahjong.hand_calculating.hand import HandCalculator
 from mahjong.meld import Meld
@@ -76,6 +78,14 @@ YAKU_JAPANESE_NAMES = {
     120: "ドラ",
     121: "赤ドラ",
     122: "裏ドラ",
+}
+
+CALCULATION_ERROR_MESSAGES = {
+    "hand_not_winning": "和了形になっていません。手牌・和了牌・副露/暗槓の枚数と組み合わせを確認してください。",
+    "no_yaku": "役がありません。立直、役牌、断么九などの役条件を確認してください。",
+    "no_winning_tile": "和了牌が指定されていません。認識結果の和了牌、または手入力の和了牌を確認してください。",
+    "too_many_tiles": "牌が多すぎます。手牌・副露・暗槓・ドラ表示牌の役割が正しいか確認してください。",
+    "too_few_tiles": "牌が足りません。検出漏れや除外された牌がないか確認してください。",
 }
 
 
@@ -160,6 +170,33 @@ def format_yaku_names(yaku_list: Any) -> list[str]:
     return [format_yaku_name(yaku) for yaku in yaku_list or []]
 
 
+def format_calculation_error(error: Any) -> str:
+    raw_message = str(error or "").strip()
+    if not raw_message:
+        return "計算に失敗しました。入力を確認してください。"
+
+    translated = CALCULATION_ERROR_MESSAGES.get(raw_message)
+    if translated:
+        return f"{translated} ({raw_message})"
+
+    if raw_message.startswith("An error occurred: "):
+        inner_message = raw_message.removeprefix("An error occurred: ").strip()
+        translated = CALCULATION_ERROR_MESSAGES.get(inner_message)
+        if translated:
+            return f"{translated} ({inner_message})"
+
+    if raw_message.startswith("Invalid input for tiles"):
+        return "手牌の入力が不正です。牌の枚数や赤ドラ指定を確認してください。"
+    if raw_message.startswith("Invalid input for win tile"):
+        return "和了牌の入力が不正です。和了牌が1枚だけ指定されているか確認してください。"
+    if raw_message.startswith("Invalid input for melds"):
+        return "副露/暗槓の入力が不正です。チー・ポン・カンの組み合わせを確認してください。"
+    if raw_message.startswith("Invalid input for dora indicators"):
+        return "ドラ表示牌の入力が不正です。ドラ表示牌の指定を確認してください。"
+
+    return f"計算に失敗しました: {raw_message}"
+
+
 def serialize_calculation_result(
     result: Any, config_dict: Optional[Dict[str, Any]] = None
 ) -> dict[str, Any]:
@@ -177,10 +214,11 @@ def serialize_calculation_result(
             "payment": format_payment(cost, is_tsumo, is_dealer),
         }
     except Exception:
+        error_message = format_calculation_error(result)
         return {
             "ok": False,
-            "error": str(result),
-            "yaku": str(result),
+            "error": error_message,
+            "yaku": error_message,
             "han": "",
             "fu": "",
             "cost": "",
@@ -215,6 +253,7 @@ def calculate_hand(
             pin=tiles_dict.get("pin", ""),
             sou=tiles_dict.get("sou", ""),
             honors=tiles_dict.get("honors", ""),
+            has_aka_dora=True,
         )
     except IndexError:
         return "Invalid input for tiles"
@@ -224,6 +263,7 @@ def calculate_hand(
             pin=win_tile_dict.get("pin", ""),
             sou=win_tile_dict.get("sou", ""),
             honors=win_tile_dict.get("honors", ""),
+            has_aka_dora=True,
         )[0]
     except IndexError:
         return "Invalid input for win tile"
@@ -231,6 +271,8 @@ def calculate_hand(
     # 副露の情報を取得
     # 鳴き(チー:CHI, ポン:PON, カン:KAN(True:ミンカン,False:アンカン), カカン:CHANKAN, ヌキドラ:NUKI)
     melds = []
+    meld_tiles = []
+    kan_count = 0
     if melds_dict:
         try:
             for kind, meld_kind_str in melds_dict.items():
@@ -245,6 +287,7 @@ def calculate_hand(
                     is_minkan: bool = False
                     if len(meld) == 4 + 1:
                         is_kan = True
+                        kan_count += 1
                         if meld[0] != "a" and meld[0] != "m":
                             return "kan meld should start with 'a' or 'm'"
                         is_minkan = meld[0] == "m"
@@ -262,11 +305,17 @@ def calculate_hand(
                         return "Invalid input for melds"
                     # 副露の牌を取得
                     if kind == "man":
-                        meld_tile = TilesConverter.string_to_136_array(man=meld)
+                        meld_tile = TilesConverter.string_to_136_array(
+                            man=meld, has_aka_dora=True
+                        )
                     elif kind == "pin":
-                        meld_tile = TilesConverter.string_to_136_array(pin=meld)
+                        meld_tile = TilesConverter.string_to_136_array(
+                            pin=meld, has_aka_dora=True
+                        )
                     elif kind == "sou":
-                        meld_tile = TilesConverter.string_to_136_array(sou=meld)
+                        meld_tile = TilesConverter.string_to_136_array(
+                            sou=meld, has_aka_dora=True
+                        )
                     elif kind == "honors":
                         meld_tile = TilesConverter.string_to_136_array(honors=meld)
                     else:
@@ -281,11 +330,16 @@ def calculate_hand(
                     else:
                         return "Invalid input for melds"
                     opened = True if is_chi or is_pon else is_minkan
+                    meld_tiles.extend(meld_tile)
                     melds.append(
                         Meld(meld_type=meld_kind, tiles=meld_tile, opened=opened)
                     )
         except (IndexError, ValueError):
             return "Invalid input for melds"
+
+    expected_tile_count = 14 + kan_count
+    if len(tiles) != expected_tile_count and len(tiles) + len(meld_tiles) == expected_tile_count:
+        tiles = tiles + meld_tiles
 
     dora_indicators = []
     if dora_indicators_dict:
@@ -295,11 +349,17 @@ def calculate_hand(
                     if char == "":
                         continue
                     if kind == "man":
-                        dora_tile = TilesConverter.string_to_136_array(man=char)[0]
+                        dora_tile = TilesConverter.string_to_136_array(
+                            man=char, has_aka_dora=True
+                        )[0]
                     elif kind == "pin":
-                        dora_tile = TilesConverter.string_to_136_array(pin=char)[0]
+                        dora_tile = TilesConverter.string_to_136_array(
+                            pin=char, has_aka_dora=True
+                        )[0]
                     elif kind == "sou":
-                        dora_tile = TilesConverter.string_to_136_array(sou=char)[0]
+                        dora_tile = TilesConverter.string_to_136_array(
+                            sou=char, has_aka_dora=True
+                        )[0]
                     elif kind == "honors":
                         dora_tile = TilesConverter.string_to_136_array(honors=char)[0]
                     else:
@@ -308,7 +368,9 @@ def calculate_hand(
         except (IndexError, ValueError):
             return "Invalid input for dora indicators"
 
-    config = HandConfig(**config_dict)
+    config = HandConfig(
+        **config_dict, options=OptionalRules(has_aka_dora=True)
+    )
     try:
         result = calculator.estimate_hand_value(
             tiles, win_tile, melds=melds, dora_indicators=dora_indicators, config=config
@@ -360,7 +422,7 @@ def index():
             except Exception as e:
                 print(result)
                 print(f"An error occurred: {str(e)}")
-                yaku = result
+                yaku = format_calculation_error(result)
                 han = ""
                 fu = ""
                 cost = ""
@@ -413,4 +475,8 @@ def detect():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(
+        host=os.environ.get("FLASK_RUN_HOST", "127.0.0.1"),
+        port=int(os.environ.get("FLASK_RUN_PORT", "5000")),
+        debug=os.environ.get("FLASK_DEBUG", "0") == "1",
+    )

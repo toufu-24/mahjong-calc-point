@@ -11,6 +11,18 @@
 
 分類器が未配置の場合は、従来通りYOLOのクラスラベルへフォールバックします。分類器を必須にしたい場合は `MAHJONG_REQUIRE_TILE_CLASSIFIER=1` を指定してください。
 
+## ブラウザで起動する
+
+PC上で起動して同じWi-Fiのスマホから使う場合は、LAN向けに待ち受けます。
+
+```bash
+FLASK_RUN_HOST=0.0.0.0 FLASK_RUN_PORT=5000 uv run python -m src.mahjong_calc_point.flask.app
+```
+
+PCのIPアドレスを確認し、スマホのブラウザで `http://<PCのIPアドレス>:5000` を開きます。
+
+スマホのカメラをブラウザから直接使うには、ブラウザの制限によりHTTPSまたはlocalhostが必要です。HTTPのLAN接続では「画像を選択」から撮影・アップロードする使い方が安定です。
+
 ## Roboflowデータから分類器を作る
 
 Roboflow Universeの [mahjong Object Detection Dataset](https://universe.roboflow.com/project-xv49e/mahjong-x5dzz) をYOLOv5形式でダウンロードし、`annotation/train` と `annotation/valid` に展開します。
