@@ -61,23 +61,34 @@
                         <div class="option-section">
                             <div class="option-header">
                                 <h3>副露</h3>
-                                <span class="option-note">認識結果に追加・修正</span>
+                                <span class="option-note">面子単位で確認・追加</span>
                             </div>
-                            <div class="builder-row">
-                                <label for="meldType">種類
-                                    <select id="meldType">
-                                        <option value="c">チー</option>
-                                        <option value="p">ポン</option>
-                                        <option value="a">暗槓</option>
-                                        <option value="m">明槓</option>
-                                    </select>
-                                </label>
-                                <label for="meldTile">牌
-                                    <select id="meldTile"></select>
-                                </label>
-                                <button type="button" id="addMeldButton" class="secondary-button builder-button">追加</button>
+                            <div class="meld-builder">
+                                <label class="sr-only" for="meldType">副露の種類</label>
+                                <select id="meldType" class="sr-only-control">
+                                    <option value="c">チー</option>
+                                    <option value="p">ポン</option>
+                                    <option value="m">明槓</option>
+                                    <option value="a">暗槓</option>
+                                </select>
+                                <div class="meld-type-control" role="group" aria-label="副露の種類">
+                                    <button type="button" class="meld-type-button is-active" data-meld-type="c">チー</button>
+                                    <button type="button" class="meld-type-button" data-meld-type="p">ポン</button>
+                                    <button type="button" class="meld-type-button" data-meld-type="m">明槓</button>
+                                    <button type="button" class="meld-type-button" data-meld-type="a">暗槓</button>
+                                </div>
+                                <div class="meld-entry-row">
+                                    <label for="meldTile">牌
+                                        <select id="meldTile"></select>
+                                    </label>
+                                    <div class="meld-preview-field">
+                                        <span class="field-label">面子</span>
+                                        <div id="meldPreview" class="meld-preview" aria-live="polite"></div>
+                                    </div>
+                                    <button type="button" id="addMeldButton" class="secondary-button builder-button">追加</button>
+                                </div>
                             </div>
-                            <div id="meldList" class="chip-list empty">副露なし</div>
+                            <div id="meldList" class="meld-list empty">副露なし</div>
                         </div>
 
                         <div class="option-section">
@@ -210,7 +221,9 @@
             z: document.getElementById("dora_honors"),
         };
         const meldType = document.getElementById("meldType");
+        const meldTypeButtons = Array.from(document.querySelectorAll("[data-meld-type]"));
         const meldTile = document.getElementById("meldTile");
+        const meldPreview = document.getElementById("meldPreview");
         const addMeldButton = document.getElementById("addMeldButton");
         const meldList = document.getElementById("meldList");
         const doraTile = document.getElementById("doraTile");
@@ -220,6 +233,8 @@
         let latestImage = null;
         let detectedTiles = [];
         let selectedWinIndex = null;
+        let selectedCorrectionIndex = null;
+        let isCorrectionPanelOpen = false;
         let currentImageSize = { width: 0, height: 0 };
         let meldSelections = [];
         let doraSelections = [];
@@ -265,6 +280,11 @@
             p: "ポン",
             a: "暗槓",
             m: "明槓",
+        };
+        const SUIT_SHORT_LABELS = {
+            m: "萬",
+            p: "筒",
+            s: "索",
         };
         const DETECTION_ROLE_LABELS = {
             hand: "手牌",
@@ -415,6 +435,62 @@
             return label;
         }
 
+        function getTileShortLabel(label) {
+            const parsed = parseTileLabel(label);
+            if (!parsed) {
+                return label;
+            }
+            if (parsed.suit === "z") {
+                return getTileName(label);
+            }
+            const prefix = parsed.isRed ? "赤5" : parsed.rank;
+            return `${prefix}${SUIT_SHORT_LABELS[parsed.suit] || parsed.suit}`;
+        }
+
+        function createMiniTile(tileCode) {
+            const parsed = parseTileLabel(tileCode);
+            const tile = document.createElement("span");
+            tile.className = "mini-tile";
+            if (parsed) {
+                tile.classList.add(`tile-suit-${parsed.suit}`);
+                if (parsed.isRed) {
+                    tile.classList.add("is-red");
+                }
+            }
+            tile.textContent = getTileShortLabel(tileCode);
+            tile.title = getTileName(tileCode);
+            return tile;
+        }
+
+        function renderTileStrip(tileCodes) {
+            const strip = document.createElement("div");
+            strip.className = "meld-tile-strip";
+            tileCodes.forEach((tileCode) => {
+                strip.appendChild(createMiniTile(tileCode));
+            });
+            return strip;
+        }
+
+        function renderDetectedTileStrip(tiles) {
+            const strip = document.createElement("div");
+            strip.className = "meld-tile-strip recognition-tile-strip";
+            tiles.forEach((tile) => {
+                const element = createMiniTile(tile.label);
+                if (tile.role === "win") {
+                    element.classList.add("is-win");
+                }
+                strip.appendChild(element);
+            });
+            return strip;
+        }
+
+        function createSummaryTag(text, modifier = "") {
+            const tag = document.createElement("span");
+            tag.className = modifier ? `recognition-tag ${modifier}` : "recognition-tag";
+            tag.textContent = text;
+            return tag;
+        }
+
         function createOption(value, text, selectedValue) {
             const option = document.createElement("option");
             option.value = value;
@@ -456,11 +532,12 @@
                 });
                 meldTile.appendChild(optgroup);
             });
+            updateMeldPreview();
         }
 
         function buildMeldCode(type, tileCode) {
             const parsed = parseTileLabel(tileCode);
-            if (!parsed) {
+            if (!parsed || !MELD_TYPE_LABELS[type]) {
                 return null;
             }
             if (type === "c") {
@@ -470,6 +547,7 @@
                 }
                 return {
                     suit: parsed.suit,
+                    type,
                     code: `c${start}${start + 1}${start + 2}`,
                     label: `${getTileName(tileCode)}からチー`,
                     source: "manual",
@@ -478,10 +556,52 @@
             const count = type === "p" ? 3 : 4;
             return {
                 suit: parsed.suit,
+                type,
                 code: `${type}${parsed.rank.repeat(count)}`,
                 label: `${getTileName(tileCode)} ${MELD_TYPE_LABELS[type]}`,
                 source: "manual",
             };
+        }
+
+        function getMeldTileCodes(meld) {
+            return meld.code
+                .slice(1)
+                .split("")
+                .map((value) => `${value}${meld.suit}`);
+        }
+
+        function updateMeldTypeButtons() {
+            meldTypeButtons.forEach((button) => {
+                const isActive = button.dataset.meldType === meldType.value;
+                button.classList.toggle("is-active", isActive);
+                button.setAttribute("aria-pressed", String(isActive));
+            });
+        }
+
+        function setMeldType(type) {
+            if (!MELD_TYPE_LABELS[type]) {
+                return;
+            }
+            meldType.value = type;
+            updateMeldTypeButtons();
+            appendMeldTileOptions();
+        }
+
+        function updateMeldPreview() {
+            const meld = buildMeldCode(meldType.value, meldTile.value);
+            meldPreview.innerHTML = "";
+            if (!meld) {
+                meldPreview.textContent = "選択不可";
+                meldPreview.classList.add("is-invalid");
+                return;
+            }
+            meldPreview.classList.remove("is-invalid");
+
+            const badge = document.createElement("span");
+            badge.className = `meld-type-badge meld-type-${meld.type}`;
+            badge.textContent = MELD_TYPE_LABELS[meld.type] || "副露";
+
+            meldPreview.append(renderTileStrip(getMeldTileCodes(meld)), badge);
         }
 
         function parseMeldSelectionsFromInputs() {
@@ -523,13 +643,30 @@
             }
             meldList.classList.remove("empty");
             meldSelections.forEach((meld, index) => {
-                const chip = document.createElement("span");
-                chip.className = "selection-chip";
-                chip.textContent = meld.label;
+                const card = document.createElement("div");
+                card.className = `meld-card meld-card-${meld.type}`;
+
+                const header = document.createElement("div");
+                header.className = "meld-card-header";
+
+                const badge = document.createElement("span");
+                badge.className = `meld-type-badge meld-type-${meld.type}`;
+                badge.textContent = MELD_TYPE_LABELS[meld.type] || "副露";
+
+                const source = document.createElement("span");
+                source.className = "meld-source";
+                source.textContent = meld.source === "detected" ? "認識" : "手入力";
+                header.append(badge, source);
+
+                const name = document.createElement("span");
+                name.className = "meld-card-name";
+                name.textContent = meld.label;
 
                 const button = document.createElement("button");
                 button.type = "button";
+                button.className = "meld-delete-button";
                 button.setAttribute("aria-label", `${meld.label}を削除`);
+                button.title = "削除";
                 button.textContent = "×";
                 button.addEventListener("click", () => {
                     if (meld.source === "detected" && Array.isArray(meld.tileIndexes)) {
@@ -545,8 +682,8 @@
                     syncMeldInputs();
                     renderMeldList();
                 });
-                chip.appendChild(button);
-                meldList.appendChild(chip);
+                card.append(header, renderTileStrip(getMeldTileCodes(meld)), name, button);
+                meldList.appendChild(card);
             });
         }
 
@@ -610,6 +747,8 @@
             appendTileOptions(doraTile, "", { includeRed: false });
             parseMeldSelectionsFromInputs();
             parseDoraSelectionsFromInputs();
+            updateMeldTypeButtons();
+            updateMeldPreview();
             syncMeldInputs();
             syncDoraInputs();
             renderMeldList();
@@ -1161,6 +1300,8 @@
             latestImage = null;
             detectedTiles = [];
             selectedWinIndex = null;
+            selectedCorrectionIndex = null;
+            isCorrectionPanelOpen = false;
             currentImageSize = { width: 0, height: 0 };
             meldSelections = [];
             doraSelections = [];
@@ -1226,6 +1367,250 @@
             });
         }
 
+        function createRecognitionSummary() {
+            const summary = document.createElement("div");
+            summary.className = "recognition-summary";
+
+            const handTiles = detectedTiles.filter(isActiveHandTile);
+            const winTile = selectedWinIndex !== null ? detectedTiles[selectedWinIndex] : handTiles.find((tile) => tile.role === "win");
+            const detectedMeldCount = meldSelections.filter((meld) => meld.source === "detected").length;
+            const detectedDoraCount = doraSelections.filter((tile) => tile.source === "detected").length;
+            const ignoredCount = detectedTiles.filter((tile) => tile.role === "ignored").length;
+
+            const main = document.createElement("div");
+            main.className = "recognition-summary-main";
+
+            const titleRow = document.createElement("div");
+            titleRow.className = "recognition-summary-title-row";
+
+            const title = document.createElement("span");
+            title.className = "recognition-summary-title";
+            title.textContent = "手牌";
+
+            const count = document.createElement("span");
+            count.className = "recognition-summary-count";
+            count.textContent = `${handTiles.length}枚`;
+            titleRow.append(title, count);
+
+            main.appendChild(titleRow);
+            if (handTiles.length) {
+                main.appendChild(renderDetectedTileStrip(handTiles));
+            } else {
+                const empty = document.createElement("span");
+                empty.className = "recognition-summary-empty";
+                empty.textContent = "手牌なし";
+                main.appendChild(empty);
+            }
+
+            const tags = document.createElement("div");
+            tags.className = "recognition-tags";
+            if (winTile && parseTileLabel(winTile.label)) {
+                tags.appendChild(createSummaryTag(`和了 ${getTileName(winTile.label)}`, "is-win"));
+            }
+            if (detectedMeldCount) {
+                tags.appendChild(createSummaryTag(`副露 ${detectedMeldCount}組`));
+            }
+            if (detectedDoraCount) {
+                tags.appendChild(createSummaryTag(`ドラ ${detectedDoraCount}枚`));
+            }
+            if (ignoredCount) {
+                tags.appendChild(createSummaryTag(`除外 ${ignoredCount}枚`, "is-muted"));
+            }
+            if (tags.children.length) {
+                main.appendChild(tags);
+            }
+
+            summary.appendChild(main);
+            return summary;
+        }
+
+        function getCorrectionIndex() {
+            if (detectedTiles.length === 0) {
+                selectedCorrectionIndex = null;
+                return null;
+            }
+            if (!Number.isInteger(selectedCorrectionIndex) || selectedCorrectionIndex < 0 || selectedCorrectionIndex >= detectedTiles.length) {
+                selectedCorrectionIndex = 0;
+            }
+            return selectedCorrectionIndex;
+        }
+
+        function removeDetectedTile(index) {
+            const tile = detectedTiles[index];
+            detectedTiles.splice(index, 1);
+            if (selectedWinIndex === index) {
+                selectedWinIndex = detectedTiles.length ? Math.min(index, detectedTiles.length - 1) : null;
+            } else if (selectedWinIndex !== null && selectedWinIndex > index) {
+                selectedWinIndex -= 1;
+            }
+            if (selectedCorrectionIndex === index) {
+                selectedCorrectionIndex = detectedTiles.length ? Math.min(index, detectedTiles.length - 1) : null;
+            } else if (selectedCorrectionIndex !== null && selectedCorrectionIndex > index) {
+                selectedCorrectionIndex -= 1;
+            }
+            refreshDetectionState(`${getTileName(tile.label)} を削除しました。`);
+        }
+
+        function createCorrectionTileButton(detection, index) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = `correction-tile-button role-${detection.role || "hand"}`;
+            button.dataset.correctionIndex = String(index);
+            if (index === selectedCorrectionIndex) {
+                button.classList.add("is-selected");
+            }
+            button.setAttribute("aria-pressed", String(index === selectedCorrectionIndex));
+            button.setAttribute("aria-label", `${getTileName(detection.label)}を選択`);
+
+            const tile = createMiniTile(detection.label);
+            if (detection.role === "win") {
+                tile.classList.add("is-win");
+            }
+
+            const role = document.createElement("span");
+            role.className = "correction-role-label";
+            role.textContent = DETECTION_ROLE_LABELS[detection.role] || "手牌";
+
+            const meta = document.createElement("span");
+            meta.className = "correction-tile-meta";
+            meta.textContent = detection.confidence < 1 ? `${(detection.confidence * 100).toFixed(0)}%` : "手動";
+
+            button.append(tile, role, meta);
+            button.addEventListener("click", () => {
+                selectedCorrectionIndex = index;
+                isCorrectionPanelOpen = true;
+                renderDetectionControls();
+            });
+            return button;
+        }
+
+        function createRoleActionButton(role, index) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = `correction-role-button role-${role}`;
+            button.dataset.correctionRole = role;
+            const isActive = detectedTiles[index]?.role === role;
+            button.classList.toggle("is-active", isActive);
+            button.setAttribute("aria-pressed", String(isActive));
+            button.textContent = DETECTION_ROLE_LABELS[role];
+            button.addEventListener("click", () => {
+                if (!detectedTiles[index]) {
+                    return;
+                }
+                if (role === "win") {
+                    detectedTiles.forEach((tile) => {
+                        if (tile.role === "win") {
+                            tile.role = "hand";
+                        }
+                    });
+                    selectedWinIndex = index;
+                } else if (detectedTiles[index].role === "win") {
+                    selectedWinIndex = null;
+                }
+                detectedTiles[index].role = role;
+                selectedCorrectionIndex = index;
+                isCorrectionPanelOpen = true;
+                refreshDetectionState(`${getTileName(detectedTiles[index].label)} を${DETECTION_ROLE_LABELS[role]}にしました。`);
+            });
+            return button;
+        }
+
+        function createTilePaletteButton(tile, selectedLabel, index) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "tile-palette-button";
+            button.dataset.tileCode = tile.code;
+            if (tile.code === selectedLabel) {
+                button.classList.add("is-active");
+            }
+            button.setAttribute("aria-pressed", String(tile.code === selectedLabel));
+            button.setAttribute("aria-label", `${tile.name}に修正`);
+            button.appendChild(createMiniTile(tile.code));
+            button.addEventListener("click", () => {
+                if (!detectedTiles[index]) {
+                    return;
+                }
+                detectedTiles[index].label = tile.code;
+                selectedCorrectionIndex = index;
+                isCorrectionPanelOpen = true;
+                refreshDetectionState(`${tile.name} に修正しました。`);
+            });
+            return button;
+        }
+
+        function createTilePalette(selectedLabel, index) {
+            const palette = document.createElement("div");
+            palette.className = "tile-palette";
+            TILE_OPTIONS.forEach((group) => {
+                const section = document.createElement("div");
+                section.className = "tile-palette-section";
+
+                const title = document.createElement("span");
+                title.className = "tile-palette-title";
+                title.textContent = group.name;
+
+                const grid = document.createElement("div");
+                grid.className = "tile-palette-grid";
+                group.tiles.forEach((tile) => {
+                    grid.appendChild(createTilePaletteButton(tile, selectedLabel, index));
+                });
+
+                section.append(title, grid);
+                palette.appendChild(section);
+            });
+            return palette;
+        }
+
+        function createCorrectionPanel() {
+            const selectedIndex = getCorrectionIndex();
+            const shell = document.createElement("div");
+            shell.className = "correction-shell";
+
+            const rail = document.createElement("div");
+            rail.className = "correction-rail";
+            detectedTiles.forEach((detection, index) => {
+                rail.appendChild(createCorrectionTileButton(detection, index));
+            });
+
+            const editor = document.createElement("div");
+            editor.className = "correction-editor";
+            if (selectedIndex === null) {
+                editor.textContent = "修正する牌がありません。";
+                shell.append(rail, editor);
+                return shell;
+            }
+
+            const selectedTile = detectedTiles[selectedIndex];
+            const header = document.createElement("div");
+            header.className = "correction-editor-header";
+
+            const selectedPreview = document.createElement("div");
+            selectedPreview.className = "correction-selected-preview";
+            selectedPreview.appendChild(createMiniTile(selectedTile.label));
+
+            const selectedName = document.createElement("div");
+            selectedName.className = "correction-selected-name";
+            selectedName.textContent = getTileName(selectedTile.label);
+
+            const deleteButton = document.createElement("button");
+            deleteButton.type = "button";
+            deleteButton.className = "remove-tile-button correction-delete-button";
+            deleteButton.textContent = "削除";
+            deleteButton.addEventListener("click", () => removeDetectedTile(selectedIndex));
+
+            header.append(selectedPreview, selectedName, deleteButton);
+
+            const roles = document.createElement("div");
+            roles.className = "correction-role-grid";
+            Object.keys(DETECTION_ROLE_LABELS).forEach((role) => {
+                roles.appendChild(createRoleActionButton(role, selectedIndex));
+            });
+
+            editor.append(header, roles, createTilePalette(selectedTile.label, selectedIndex));
+            shell.append(rail, editor);
+            return shell;
+        }
+
         function renderDetectionControls() {
             detectionsElement.innerHTML = "";
             if (detectedTiles.length === 0) {
@@ -1237,36 +1622,24 @@
             }
 
             detectionsElement.classList.remove("empty");
+            detectionsElement.appendChild(createRecognitionSummary());
 
-            const editorList = document.createElement("div");
-            editorList.className = "tile-editor-list";
-            detectedTiles.forEach((detection, index) => {
-                const item = document.createElement("div");
-                item.className = "tile-editor";
+            getCorrectionIndex();
 
-                const meta = document.createElement("span");
-                meta.className = "tile-meta";
-                meta.textContent = detection.confidence < 1 ? `${(detection.confidence * 100).toFixed(0)}%` : "手動";
-
-                const removeButton = document.createElement("button");
-                removeButton.type = "button";
-                removeButton.className = "remove-tile-button";
-                removeButton.setAttribute("aria-label", `${getTileName(detection.label)}を削除`);
-                removeButton.textContent = "削除";
-                removeButton.addEventListener("click", () => {
-                    detectedTiles.splice(index, 1);
-                    if (selectedWinIndex === index) {
-                        selectedWinIndex = detectedTiles.length ? Math.min(index, detectedTiles.length - 1) : null;
-                    } else if (selectedWinIndex !== null && selectedWinIndex > index) {
-                        selectedWinIndex -= 1;
-                    }
-                    refreshDetectionState(`${getTileName(detection.label)} を削除しました。`);
-                });
-
-                item.append(createTileSelect(detection.label, index), createRoleSelect(detection.role, index), meta, removeButton);
-                editorList.appendChild(item);
+            const details = document.createElement("details");
+            details.className = "tile-editor-details";
+            details.open = isCorrectionPanelOpen;
+            details.addEventListener("toggle", () => {
+                isCorrectionPanelOpen = details.open;
+                if (details.open) {
+                    getCorrectionIndex();
+                }
             });
-            detectionsElement.appendChild(editorList);
+            const summary = document.createElement("summary");
+            summary.textContent = "牌ごとに修正";
+            details.append(summary, createCorrectionPanel());
+            detectionsElement.appendChild(details);
+
             const activeCount = detectedTiles.filter((tile) => tile.role !== "ignored").length;
             detectCount.textContent = activeCount === detectedTiles.length ? `${detectedTiles.length}件` : `${activeCount}/${detectedTiles.length}件`;
         }
@@ -1279,6 +1652,8 @@
             currentImageSize = { width: result.image_width, height: result.image_height };
             detectedTiles = inferDetectionRoles(result.detections);
             selectedWinIndex = null;
+            selectedCorrectionIndex = null;
+            isCorrectionPanelOpen = false;
             normalizeTileRoles();
             rebuildSelectionsFromDetectedTiles();
             drawDetectionOverlay();
@@ -1330,7 +1705,16 @@
             scoreResult.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
 
-        meldType.addEventListener("change", appendMeldTileOptions);
+        meldType.addEventListener("change", () => {
+            updateMeldTypeButtons();
+            appendMeldTileOptions();
+        });
+        meldTypeButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+                setMeldType(button.dataset.meldType);
+            });
+        });
+        meldTile.addEventListener("change", updateMeldPreview);
 
         addMeldButton.addEventListener("click", () => {
             const meld = buildMeldCode(meldType.value, meldTile.value);
@@ -1390,6 +1774,8 @@
                 height: 0,
                 role: "hand",
             });
+            selectedCorrectionIndex = detectedTiles.length - 1;
+            isCorrectionPanelOpen = true;
             refreshDetectionState("手動牌を追加しました。牌名を選んで修正してください。");
         });
 
