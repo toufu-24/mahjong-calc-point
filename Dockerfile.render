@@ -1,0 +1,35 @@
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    MPLCONFIGDIR=/tmp \
+    YOLO_CONFIG_DIR=/tmp
+
+WORKDIR /app
+
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libglib2.0-0 \
+        libgl1 \
+        libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml README.md ./
+COPY src ./src
+
+RUN pip install --upgrade pip \
+    && pip install \
+        "gunicorn>=22.0.0" \
+        "mahjong>=1.2.1" \
+        "flask>=3.0.3" \
+        "torch==2.3.1" \
+        "torchvision==0.18.1" \
+        "numpy<2" \
+        "yolov5>=7.0.13" \
+        "opencv-python-headless>=4.10.0.84" \
+        "matplotlib>=3.9.2" \
+        "ultralytics>=8.2.83" \
+    && pip install --no-deps -e .
+
+CMD ["sh", "-c", "gunicorn mahjong_calc_point.flask.app:app --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 2 --timeout 180"]

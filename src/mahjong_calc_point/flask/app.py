@@ -1,15 +1,92 @@
+import os
+
 from flask import Flask, jsonify, render_template, request
 from mahjong.hand_calculating.hand import HandCalculator
 from mahjong.meld import Meld
 from mahjong.hand_calculating.hand_config import HandConfig, OptionalRules
 from mahjong.tile import TilesConverter
+from mahjong.constants import EAST, SOUTH
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from mahjong_calc_point.detection import detect_tiles
 
 app = Flask(__name__)
 calculator = HandCalculator()
+
+YAKU_JAPANESE_NAMES = {
+    0: "門前清自摸和",
+    1: "立直",
+    2: "オープン立直",
+    3: "一発",
+    4: "槍槓",
+    5: "嶺上開花",
+    6: "海底摸月",
+    7: "河底撈魚",
+    8: "ダブル立直",
+    9: "ダブルオープン立直",
+    10: "流し満貫",
+    11: "人和",
+    12: "平和",
+    13: "断么九",
+    14: "一盃口",
+    15: "役牌 白",
+    16: "役牌 発",
+    17: "役牌 中",
+    18: "自風 東",
+    19: "自風 南",
+    20: "自風 西",
+    21: "自風 北",
+    22: "場風 東",
+    23: "場風 南",
+    24: "場風 西",
+    25: "場風 北",
+    26: "三色同順",
+    27: "一気通貫",
+    28: "混全帯么九",
+    29: "混老頭",
+    30: "対々和",
+    31: "三暗刻",
+    32: "三槓子",
+    33: "三色同刻",
+    34: "七対子",
+    35: "小三元",
+    36: "混一色",
+    37: "純全帯么九",
+    38: "二盃口",
+    39: "清一色",
+    100: "国士無双",
+    101: "九蓮宝燈",
+    102: "四暗刻",
+    103: "大三元",
+    104: "小四喜",
+    105: "緑一色",
+    106: "四槓子",
+    107: "字一色",
+    108: "清老頭",
+    109: "大車輪",
+    110: "大七星",
+    111: "大四喜",
+    112: "国士無双十三面待ち",
+    113: "四暗刻単騎",
+    114: "純正九蓮宝燈",
+    115: "天和",
+    116: "地和",
+    117: "人和 役満",
+    118: "責任払い",
+    119: "八連荘",
+    120: "ドラ",
+    121: "赤ドラ",
+    122: "裏ドラ",
+}
+
+CALCULATION_ERROR_MESSAGES = {
+    "hand_not_winning": "和了形になっていません。手牌・和了牌・副露/暗槓の枚数と組み合わせを確認してください。",
+    "no_yaku": "役がありません。立直、役牌、断么九などの役条件を確認してください。",
+    "no_winning_tile": "和了牌が指定されていません。認識結果の和了牌、または手入力の和了牌を確認してください。",
+    "too_many_tiles": "牌が多すぎます。手牌・副露・暗槓・ドラ表示牌の役割が正しいか確認してください。",
+    "too_few_tiles": "牌が足りません。検出漏れや除外された牌がないか確認してください。",
+}
 
 
 def parse_calculation_form(form: Any):
@@ -50,6 +127,7 @@ def parse_calculation_form(form: Any):
         "is_tenhou": form.get("is_tenhou", "off") == "on",
         "is_chiihou": form.get("is_chiihou", "off") == "on",
         "is_renhou": form.get("is_renhou", "off") == "on",
+        "player_wind": EAST if form.get("is_dealer", "off") == "on" else SOUTH,
     }
     return (
         tiles_dict,
@@ -60,23 +138,91 @@ def parse_calculation_form(form: Any):
     )
 
 
-def serialize_calculation_result(result: Any) -> dict[str, Any]:
+def format_payment(cost: dict[str, Any], is_tsumo: bool, is_dealer: bool) -> str:
+    main = cost.get("main", "")
+    additional = cost.get("additional", "")
+    total = cost.get("total", "")
+
+    if main == "":
+        return ""
+
+    if not is_tsumo:
+        return f"放銃者から {main}点"
+
+    if is_dealer:
+        total_text = f" (合計 {total}点)" if total else ""
+        return f"子3人から {main}点ずつ{total_text}"
+
+    total_text = f" (合計 {total}点)" if total else ""
+    return f"親から {main}点、子2人から {additional}点ずつ{total_text}"
+
+
+def format_yaku_name(yaku: Any) -> str:
+    yaku_id = getattr(yaku, "yaku_id", None)
+    name = YAKU_JAPANESE_NAMES.get(yaku_id, str(yaku))
+    if yaku_id in {120, 121, 122}:
+        han = getattr(yaku, "han_closed", None) or getattr(yaku, "han_open", None)
+        return f"{name} {han}" if han else name
+    return name
+
+
+def format_yaku_names(yaku_list: Any) -> list[str]:
+    return [format_yaku_name(yaku) for yaku in yaku_list or []]
+
+
+def format_calculation_error(error: Any) -> str:
+    raw_message = str(error or "").strip()
+    if not raw_message:
+        return "計算に失敗しました。入力を確認してください。"
+
+    translated = CALCULATION_ERROR_MESSAGES.get(raw_message)
+    if translated:
+        return f"{translated} ({raw_message})"
+
+    if raw_message.startswith("An error occurred: "):
+        inner_message = raw_message.removeprefix("An error occurred: ").strip()
+        translated = CALCULATION_ERROR_MESSAGES.get(inner_message)
+        if translated:
+            return f"{translated} ({inner_message})"
+
+    if raw_message.startswith("Invalid input for tiles"):
+        return "手牌の入力が不正です。牌の枚数や赤ドラ指定を確認してください。"
+    if raw_message.startswith("Invalid input for win tile"):
+        return "和了牌の入力が不正です。和了牌が1枚だけ指定されているか確認してください。"
+    if raw_message.startswith("Invalid input for melds"):
+        return "副露/暗槓の入力が不正です。チー・ポン・カンの組み合わせを確認してください。"
+    if raw_message.startswith("Invalid input for dora indicators"):
+        return "ドラ表示牌の入力が不正です。ドラ表示牌の指定を確認してください。"
+
+    return f"計算に失敗しました: {raw_message}"
+
+
+def serialize_calculation_result(
+    result: Any, config_dict: Optional[Dict[str, Any]] = None
+) -> dict[str, Any]:
     try:
+        cost = result.cost
+        config_dict = config_dict or {}
+        is_tsumo = bool(config_dict.get("is_tsumo", False))
+        is_dealer = config_dict.get("player_wind") == EAST
         return {
             "ok": True,
-            "yaku": [str(yaku) for yaku in result.yaku],
+            "yaku": format_yaku_names(result.yaku),
             "han": result.han,
             "fu": result.fu,
-            "cost": result.cost.get("main", ""),
+            "cost": cost.get("main", ""),
+            "payment": format_payment(cost, is_tsumo, is_dealer),
         }
     except Exception:
+        error_message = format_calculation_error(result)
         return {
             "ok": False,
-            "error": str(result),
-            "yaku": str(result),
+            "error": error_message,
+            "yaku": error_message,
             "han": "",
             "fu": "",
             "cost": "",
+            "payment": "",
         }
 
 
@@ -107,6 +253,7 @@ def calculate_hand(
             pin=tiles_dict.get("pin", ""),
             sou=tiles_dict.get("sou", ""),
             honors=tiles_dict.get("honors", ""),
+            has_aka_dora=True,
         )
     except IndexError:
         return "Invalid input for tiles"
@@ -116,6 +263,7 @@ def calculate_hand(
             pin=win_tile_dict.get("pin", ""),
             sou=win_tile_dict.get("sou", ""),
             honors=win_tile_dict.get("honors", ""),
+            has_aka_dora=True,
         )[0]
     except IndexError:
         return "Invalid input for win tile"
@@ -123,6 +271,8 @@ def calculate_hand(
     # 副露の情報を取得
     # 鳴き(チー:CHI, ポン:PON, カン:KAN(True:ミンカン,False:アンカン), カカン:CHANKAN, ヌキドラ:NUKI)
     melds = []
+    meld_tiles = []
+    kan_count = 0
     if melds_dict:
         try:
             for kind, meld_kind_str in melds_dict.items():
@@ -137,6 +287,7 @@ def calculate_hand(
                     is_minkan: bool = False
                     if len(meld) == 4 + 1:
                         is_kan = True
+                        kan_count += 1
                         if meld[0] != "a" and meld[0] != "m":
                             return "kan meld should start with 'a' or 'm'"
                         is_minkan = meld[0] == "m"
@@ -154,11 +305,17 @@ def calculate_hand(
                         return "Invalid input for melds"
                     # 副露の牌を取得
                     if kind == "man":
-                        meld_tile = TilesConverter.string_to_136_array(man=meld)
+                        meld_tile = TilesConverter.string_to_136_array(
+                            man=meld, has_aka_dora=True
+                        )
                     elif kind == "pin":
-                        meld_tile = TilesConverter.string_to_136_array(pin=meld)
+                        meld_tile = TilesConverter.string_to_136_array(
+                            pin=meld, has_aka_dora=True
+                        )
                     elif kind == "sou":
-                        meld_tile = TilesConverter.string_to_136_array(sou=meld)
+                        meld_tile = TilesConverter.string_to_136_array(
+                            sou=meld, has_aka_dora=True
+                        )
                     elif kind == "honors":
                         meld_tile = TilesConverter.string_to_136_array(honors=meld)
                     else:
@@ -172,11 +329,17 @@ def calculate_hand(
                         meld_kind = Meld.KAN
                     else:
                         return "Invalid input for melds"
+                    opened = True if is_chi or is_pon else is_minkan
+                    meld_tiles.extend(meld_tile)
                     melds.append(
-                        Meld(meld_type=meld_kind, tiles=meld_tile, opened=is_minkan)
+                        Meld(meld_type=meld_kind, tiles=meld_tile, opened=opened)
                     )
         except (IndexError, ValueError):
             return "Invalid input for melds"
+
+    expected_tile_count = 14 + kan_count
+    if len(tiles) != expected_tile_count and len(tiles) + len(meld_tiles) == expected_tile_count:
+        tiles = tiles + meld_tiles
 
     dora_indicators = []
     if dora_indicators_dict:
@@ -186,11 +349,17 @@ def calculate_hand(
                     if char == "":
                         continue
                     if kind == "man":
-                        dora_tile = TilesConverter.string_to_136_array(man=char)[0]
+                        dora_tile = TilesConverter.string_to_136_array(
+                            man=char, has_aka_dora=True
+                        )[0]
                     elif kind == "pin":
-                        dora_tile = TilesConverter.string_to_136_array(pin=char)[0]
+                        dora_tile = TilesConverter.string_to_136_array(
+                            pin=char, has_aka_dora=True
+                        )[0]
                     elif kind == "sou":
-                        dora_tile = TilesConverter.string_to_136_array(sou=char)[0]
+                        dora_tile = TilesConverter.string_to_136_array(
+                            sou=char, has_aka_dora=True
+                        )[0]
                     elif kind == "honors":
                         dora_tile = TilesConverter.string_to_136_array(honors=char)[0]
                     else:
@@ -199,7 +368,9 @@ def calculate_hand(
         except (IndexError, ValueError):
             return "Invalid input for dora indicators"
 
-    config = HandConfig(**config_dict)
+    config = HandConfig(
+        **config_dict, options=OptionalRules(has_aka_dora=True)
+    )
     try:
         result = calculator.estimate_hand_value(
             tiles, win_tile, melds=melds, dora_indicators=dora_indicators, config=config
@@ -216,6 +387,7 @@ def index():
     han = ""
     fu = ""
     cost = ""
+    payment = ""
     tiles_dict = {}
     win_tile_dict = {}
     melds_dict = {}
@@ -237,18 +409,24 @@ def index():
         # 結果を取得
         if result:
             try:
-                yaku = result.yaku
+                yaku = ", ".join(format_yaku_names(result.yaku))
                 han = result.han
                 fu = result.fu
                 cost = result.cost["main"]
+                payment = format_payment(
+                    result.cost,
+                    config_dict.get("is_tsumo", False),
+                    config_dict.get("player_wind") == EAST,
+                )
                 # print_hand_result(result)
             except Exception as e:
                 print(result)
                 print(f"An error occurred: {str(e)}")
-                yaku = result
+                yaku = format_calculation_error(result)
                 han = ""
                 fu = ""
                 cost = ""
+                payment = ""
 
     return render_template(
         "index.html",
@@ -261,6 +439,7 @@ def index():
         han=han,
         fu=fu,
         cost=cost,
+        payment=payment,
     )
 
 
@@ -276,7 +455,7 @@ def calculate():
     result = calculate_hand(
         tiles_dict, win_tile_dict, melds_dict, dora_indicators_dict, config_dict
     )
-    return jsonify(serialize_calculation_result(result))
+    return jsonify(serialize_calculation_result(result, config_dict))
 
 
 @app.route("/api/detect", methods=["POST"])
@@ -296,4 +475,8 @@ def detect():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(
+        host=os.environ.get("FLASK_RUN_HOST", "127.0.0.1"),
+        port=int(os.environ.get("FLASK_RUN_PORT", "5000")),
+        debug=os.environ.get("FLASK_DEBUG", "0") == "1",
+    )
