@@ -276,13 +276,40 @@ def _print_metrics(totals: dict[str, int]) -> None:
     print(f"matched bbox min iou: {totals['matched_iou_min'] if totals['matched_boxes'] else 0.0:.4f}")
     print(
         "two-stage label accuracy on matched boxes: "
-        f"{totals['two_stage_correct'] / matched:.4f}"
+        f"{totals['two_stage_correct']} / {matched} "
+        f"({totals['two_stage_correct'] / matched:.4f})"
     )
+
     print(
         "detector label accuracy on matched boxes: "
-        f"{totals['detector_correct'] / matched:.4f}"
+        f"{totals['detector_correct']} / {matched} "
+        f"({totals['detector_correct'] / matched:.4f})"
     )
     print(f"exact image match: {totals['exact_images'] / images:.4f}")
+
+    tp = totals["matched_boxes"]
+    fp = totals["extra_detections"]
+    fn = totals["missed_boxes"]
+
+    precision = tp / max(1, tp + fp)
+    recall = tp / max(1, tp + fn)
+    f1 = 2 * precision * recall / max(1e-12, precision + recall)
+
+    print(f"precision: {precision:.4f}")
+    print(f"recall: {recall:.4f}")
+    print(f"f1-score: {f1:.4f}")
+    print(
+        f"two-stage correct: {totals['two_stage_correct']} / {tp} "
+        f"({totals['two_stage_correct'] / max(1, tp):.4f})"
+    )
+    print(
+        f"detector correct: {totals['detector_correct']} / {tp} "
+        f"({totals['detector_correct'] / max(1, tp):.4f})"
+    )
+    print(
+        f"exact images: {totals['exact_images']} / {totals['images']} "
+        f"({totals['exact_images'] / max(1, totals['images']):.4f})"
+    )
 
 
 if __name__ == "__main__":
